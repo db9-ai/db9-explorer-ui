@@ -1,0 +1,313 @@
+import { useEffect, useState, useCallback, useRef } from 'react';
+import type { Db9Client, FileInfo } from '../lib/db9-client';
+import { useFileSystem } from '../hooks/useFileSystem';
+import { basename, joinPath, dirname } from '../lib/utils';
+import { Breadcrumb } from './Breadcrumb';
+import { Toolbar } from './Toolbar';
+import { ListView } from './ListView';
+import { GridView } from './GridView';
+import { ColumnView } from './ColumnView';
+import { FileViewer } from './FileViewer';
+import { SqlExplorer } from './SqlExplorer';
+import { CreateDialog, DeleteDialog, RenameDialog } from './Dialogs';
+import { ContextMenu, type ContextMenuItem } from './ContextMenu';
+import { RefreshIcon } from './Icons';
+
+type ActiveTab = 'files' | 'sql';
+
+interface Props {
+  client: Db9Client;
+  databaseId: string;
+  databaseName: string;
+  onDisconnect: () => void;
+}
+
+type DialogState =
+  | { type: 'none' }
+  | { type: 'create-file' }
+  | { type: 'create-folder' }
+  | { type: 'delete'; entry: FileInfo }
+  | { type: 'rename'; entry: FileInfo };
+
+interface ContextMenuState {
+  x: number;
+  y: number;
+  entry: FileInfo;
+}
+
+export function Explorer({ client, databaseId, databaseName, onDisconnect }: Props) {
+  const [activeTab, setActiveTab] = useState<ActiveTab>('files');
+  const fs = useFileSystem(client, databaseId);
+  const [dialog, setDialog] = useState<DialogState>({ type: 'none' });
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [showViewer, setShowViewer] = useState(false);
+  const uploadRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { fs.initRoot(); }, []);// eslint-disable-line react-hooks/exhaustive-deps
+
+  // Track when a file is selected for viewing
+  useEffect(() => {
+    if (fs.selectedFile && fs.selectedFile.type === 'file') {
+      setShowViewer(true);
+    }
+  }, [fs.selectedFile]);
+
+  const handleSelectEntry = useCallback((entry: FileInfo) => {
+    fs.selectEntry(entry);
+  }, [fs]);
+
+  const handleDoubleClick = useCallback((entry: FileInfo) => {
+    if (entry.type === 'dir') {
+      const dirPath = entry.path.endsWith('/') ? entry.path : entry.path + '/';
+      fs.navigateTo(dirPath);
+    } else {
+      fs.selectEntry(entry);
+    }
+  }, [fs]);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent, entry: FileInfo) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, entry });
+  }, []);
+
+  const handleNewFile = useCallback(async (name: string) => {
+    try {
+      await fs.createFile(joinPath(fs.currentPath, name));
+      setDialog({ type: 'none' });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    }
+  }, [fs]);
+
+  const handleNewFolder = useCallback(async (name: string) => {
+    try {
+      await fs.createDir(joinPath(fs.currentPath, name));
+      setDialog({ type: 'none' });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    }
+  }, [fs]);
+
+  const handleDelete = useCallback(async () => {
+    if (dialog.type !== 'delete') return;
+    try {
+      await fs.deleteEntry(dialog.entry.path, dialog.entry.type === 'dir');
+      setDialog({ type: 'none' });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    }
+  }, [fs, dialog]);
+
+  const handleRename = useCallback(async (newName: string) => {
+    if (dialog.type !== 'rename') return;
+    try {
+      const oldPath = dialog.entry.path;
+      const parent = dirname(oldPath);
+      const newPath = joinPath(parent, newName);
+      // Rename = read old content, write to new path, delete old
+      if (dialog.entry.type === 'file') {
+        const content = await client.readFile(databaseId, oldPath);
+        await client.writeFile(databaseId, newPath, content);
+        await client.remove(databaseId, oldPath);
+      } else {
+        // For directories, create new and move would be complex
+        // For now just create the new dir
+        await client.mkdir(databaseId, newPath);
+      }
+      setDialog({ type: 'none' });
+      await fs.refreshCurrent();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    }
+  }, [client, databaseId, fs, dialog]);
+
+  const handleUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      await fs.createFile(joinPath(fs.currentPath, file.name), text);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    }
+    // Reset input
+    if (uploadRef.current) uploadRef.current.value = '';
+  }, [fs]);
+
+  const handleDownload = useCallback(() => {
+    if (!fs.selectedFile || !fs.fileContent) return;
+    const blob = new Blob([fs.fileContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = basename(fs.selectedFile.path);
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [fs.selectedFile, fs.fileContent]);
+
+  const contextMenuItems: ContextMenuItem[] = contextMenu ? [
+    { label: 'Open', onClick: () => handleDoubleClick(contextMenu.entry) },
+    { label: 'Rename...', onClick: () => setDialog({ type: 'rename', entry: contextMenu.entry }) },
+    { label: 'Delete', danger: true, onClick: () => setDialog({ type: 'delete', entry: contextMenu.entry }) },
+  ] : [];
+
+  return (
+    <>
+      <div className="app-header">
+        <div className="app-logo">
+          <span>db<span className="dim">9</span></span>
+          <span className="dim">Explorer</span>
+        </div>
+        <div className="app-tabs">
+          <button className={`app-tab ${activeTab === 'files' ? 'active' : ''}`} onClick={() => setActiveTab('files')}>
+            Files
+          </button>
+          <button className={`app-tab ${activeTab === 'sql' ? 'active' : ''}`} onClick={() => setActiveTab('sql')}>
+            SQL
+          </button>
+        </div>
+        <div className="header-right">
+          <span className="db-badge">{databaseName}</span>
+          {activeTab === 'files' && (
+            <button className="btn-icon" onClick={fs.refreshCurrent} title="Refresh">
+              <RefreshIcon />
+            </button>
+          )}
+          <button className="btn-disconnect" onClick={onDisconnect}>
+            Disconnect
+          </button>
+        </div>
+      </div>
+
+      <div className="explorer-layout">
+        {activeTab === 'sql' ? (
+          <SqlExplorer client={client} databaseId={databaseId} />
+        ) : (
+        <div className="main-content">
+          <Breadcrumb path={fs.currentPath} onNavigate={fs.navigateTo} />
+          <Toolbar
+            viewMode={fs.viewMode}
+            onViewModeChange={fs.setViewMode}
+            selectedFile={fs.selectedFile}
+            onNewFile={() => setDialog({ type: 'create-file' })}
+            onNewFolder={() => setDialog({ type: 'create-folder' })}
+            onUpload={() => uploadRef.current?.click()}
+            onDownload={handleDownload}
+            onDelete={() => fs.selectedFile && setDialog({ type: 'delete', entry: fs.selectedFile })}
+            onRefresh={fs.refreshCurrent}
+          />
+
+          {showViewer && fs.selectedFile?.type === 'file' ? (
+            <>
+              <div style={{ padding: '4px 12px', borderBottom: '1px solid var(--border-subtle)' }}>
+                <button
+                  className="btn-sm btn-secondary"
+                  onClick={() => { setShowViewer(false); }}
+                  style={{ fontSize: 11 }}
+                >
+                  ← Back to listing
+                </button>
+              </div>
+              <FileViewer
+                file={fs.selectedFile}
+                content={fs.fileContent}
+                onSave={fs.saveFile}
+              />
+            </>
+          ) : (
+            <>
+              {fs.viewMode === 'list' && (
+                <ListView
+                  entries={fs.currentEntries}
+                  selectedPath={fs.selectedFile?.path ?? null}
+                  onSelect={handleSelectEntry}
+                  onDoubleClick={handleDoubleClick}
+                  onContextMenu={handleContextMenu}
+                />
+              )}
+              {fs.viewMode === 'grid' && (
+                <GridView
+                  entries={fs.currentEntries}
+                  selectedPath={fs.selectedFile?.path ?? null}
+                  onSelect={handleSelectEntry}
+                  onDoubleClick={handleDoubleClick}
+                  onContextMenu={handleContextMenu}
+                />
+              )}
+              {fs.viewMode === 'column' && (
+                <ColumnView
+                  columns={fs.columns}
+                  selectedPath={fs.selectedFile?.path ?? null}
+                  onSelect={handleSelectEntry}
+                  onContextMenu={handleContextMenu}
+                />
+              )}
+            </>
+          )}
+        </div>
+        )}
+      </div>
+
+      {/* Status bar */}
+      <div className="status-bar">
+        <span className="status-item">
+          <span className="status-dot" />
+          Connected
+        </span>
+        <span>{fs.currentEntries.length} items</span>
+        {fs.error && <span style={{ color: 'var(--danger)' }}>{fs.error}</span>}
+      </div>
+
+      {/* Hidden upload input */}
+      <input
+        ref={uploadRef}
+        type="file"
+        style={{ display: 'none' }}
+        onChange={handleUpload}
+      />
+
+      {/* Dialogs */}
+      {dialog.type === 'create-file' && (
+        <CreateDialog
+          type="file"
+          currentPath={fs.currentPath}
+          onConfirm={handleNewFile}
+          onCancel={() => setDialog({ type: 'none' })}
+        />
+      )}
+      {dialog.type === 'create-folder' && (
+        <CreateDialog
+          type="folder"
+          currentPath={fs.currentPath}
+          onConfirm={handleNewFolder}
+          onCancel={() => setDialog({ type: 'none' })}
+        />
+      )}
+      {dialog.type === 'delete' && (
+        <DeleteDialog
+          path={dialog.entry.path}
+          isDir={dialog.entry.type === 'dir'}
+          onConfirm={handleDelete}
+          onCancel={() => setDialog({ type: 'none' })}
+        />
+      )}
+      {dialog.type === 'rename' && (
+        <RenameDialog
+          currentName={basename(dialog.entry.path)}
+          onConfirm={handleRename}
+          onCancel={() => setDialog({ type: 'none' })}
+        />
+      )}
+
+      {/* Context menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenuItems}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+    </>
+  );
+}
