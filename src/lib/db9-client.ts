@@ -53,6 +53,39 @@ function getSessionSecret(): string | null {
  * browser never touches credentials.
  */
 export class Db9Client {
+  private fs9Ensured = new Set<string>();
+
+  /**
+   * Ensure the fs9 extension is enabled on the target database.
+   * Auto-detects via pg_extension, auto-enables if missing, throws on failure.
+   */
+  async ensureFs9Extension(databaseId: string): Promise<void> {
+    if (this.fs9Ensured.has(databaseId)) return;
+
+    const check = await this.sql(databaseId,
+      `SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'fs9') AS enabled`
+    );
+    const checkErr = this.parseSqlError(check);
+    if (checkErr) throw new Db9Error(`Failed to check fs9 extension status: ${checkErr}`);
+
+    const enabled = check.rows[0]?.[0];
+    if (enabled === true || enabled === 't' || enabled === 'true') {
+      this.fs9Ensured.add(databaseId);
+      return;
+    }
+
+    const create = await this.sql(databaseId, `CREATE EXTENSION IF NOT EXISTS fs9`);
+    const createErr = this.parseSqlError(create);
+    if (createErr) {
+      throw new Db9Error(
+        `The fs9 extension is required but could not be enabled: ${createErr}. ` +
+        `Try running: CREATE EXTENSION fs9`
+      );
+    }
+
+    this.fs9Ensured.add(databaseId);
+  }
+
   private async fetch<T>(path: string, init?: RequestInit): Promise<T> {
     const sessionSecret = getSessionSecret();
     const headers: Record<string, string> = {
@@ -100,6 +133,7 @@ export class Db9Client {
   }
 
   async listDir(databaseId: string, path: string): Promise<FileInfo[]> {
+    await this.ensureFs9Extension(databaseId);
     const safePath = escapeSql(path.endsWith('/') ? path : path + '/');
     const result = await this.sql(databaseId,
       `SELECT path, type, size, mode, mtime FROM extensions.fs9('${safePath}') ORDER BY type DESC, path ASC`
