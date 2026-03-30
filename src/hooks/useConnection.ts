@@ -1,128 +1,115 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Db9Client, type DatabaseInfo } from '../lib/db9-client';
 
-const DEFAULT_API_URL = import.meta.env.DEV ? '/api' : 'https://api.db9.ai';
+export type ConnectionPhase = 'loading' | 'pick-db' | 'connected' | 'error';
 
 export interface ConnectionState {
-  client: Db9Client | null;
+  phase: ConnectionPhase;
+  client: Db9Client;
+  databases: DatabaseInfo[];
   databaseId: string;
   databaseName: string;
-  connected: boolean;
+  error: string | null;
 }
 
+/**
+ * Resolves the database to connect to.
+ *
+ * Priority:
+ *  1. `?db=<name-or-id>` URL parameter (set by `db9 explore [DB]`)
+ *  2. Show database picker if multiple databases exist
+ *  3. Auto-connect if exactly one database exists
+ */
 export function useConnection() {
+  const client = useRef(new Db9Client()).current;
+
   const [state, setState] = useState<ConnectionState>({
-    client: null,
+    phase: 'loading',
+    client,
+    databases: [],
     databaseId: '',
     databaseName: '',
-    connected: false,
+    error: null,
   });
-  const [databases, setDatabases] = useState<DatabaseInfo[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const autoConnectAttempted = useRef(false);
 
-  // Auto-connect from URL params or sessionStorage on mount
+  const initAttempted = useRef(false);
+
   useEffect(() => {
-    if (autoConnectAttempted.current) return;
-    autoConnectAttempted.current = true;
-
-    const params = new URLSearchParams(window.location.search);
-    const urlToken = params.get('token');
-    const urlDb = params.get('db');
-    const urlApi = params.get('api');
-
-    // If URL has token+db, save to sessionStorage, clean URL, and auto-connect
-    if (urlToken && urlDb) {
-      const apiUrl = urlApi || DEFAULT_API_URL;
-      sessionStorage.setItem('db9_api_url', apiUrl);
-      sessionStorage.setItem('db9_token', urlToken);
-      sessionStorage.setItem('db9_db', urlDb);
-      // Clean URL params
-      window.history.replaceState({}, '', window.location.pathname);
-      autoConnect(apiUrl, urlToken, urlDb);
-      return;
-    }
-
-    // Try sessionStorage
-    const ssToken = sessionStorage.getItem('db9_token');
-    const ssDb = sessionStorage.getItem('db9_db');
-    const ssApi = sessionStorage.getItem('db9_api_url');
-    if (ssToken && ssDb) {
-      autoConnect(ssApi || DEFAULT_API_URL, ssToken, ssDb);
-    }
+    if (initAttempted.current) return;
+    initAttempted.current = true;
+    bootstrap();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function autoConnect(apiUrl: string, token: string, dbIdOrName: string) {
-    setLoading(true);
-    setError(null);
+  async function bootstrap() {
+    const params = new URLSearchParams(window.location.search);
+    const dbParam = params.get('db');
+
+    // Clean URL params
+    if (dbParam) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
     try {
-      const client = new Db9Client(apiUrl, token);
-      const dbs = await client.listDatabases();
-      // Match by id or name
-      const db = dbs.find(d => d.id === dbIdOrName || d.name === dbIdOrName);
-      if (!db) {
-        setError(`Database "${dbIdOrName}" not found`);
-        setDatabases(dbs);
-        setLoading(false);
+      // If ?db= is provided, try to connect directly
+      if (dbParam) {
+        const db = await client.getDatabase(dbParam);
+        setState(s => ({
+          ...s,
+          phase: 'connected',
+          databaseId: db.id,
+          databaseName: db.name || db.id,
+          error: null,
+        }));
         return;
       }
-      sessionStorage.setItem('db9_api_url', apiUrl);
-      sessionStorage.setItem('db9_token', token);
-      sessionStorage.setItem('db9_db', db.id);
-      setState({
-        client,
-        databaseId: db.id,
-        databaseName: db.name || db.id,
-        connected: true,
-      });
+
+      // Otherwise list databases and pick
+      const dbs = await client.listDatabases();
+      if (dbs.length === 0) {
+        setState(s => ({ ...s, phase: 'error', error: 'No active databases found.' }));
+        return;
+      }
+      if (dbs.length === 1) {
+        setState(s => ({
+          ...s,
+          phase: 'connected',
+          databases: dbs,
+          databaseId: dbs[0].id,
+          databaseName: dbs[0].name || dbs[0].id,
+        }));
+        return;
+      }
+      // Multiple databases — let user pick
+      setState(s => ({ ...s, phase: 'pick-db', databases: dbs }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
+      setState(s => ({
+        ...s,
+        phase: 'error',
+        error: err instanceof Error ? err.message : String(err),
+      }));
     }
   }
 
-  const fetchDatabases = useCallback(async (apiUrl: string, token: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const client = new Db9Client(apiUrl, token);
-      const dbs = await client.listDatabases();
-      setDatabases(dbs);
-      return dbs;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setError(msg);
-      setDatabases([]);
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const connect = useCallback((apiUrl: string, token: string, db: DatabaseInfo) => {
-    const client = new Db9Client(apiUrl, token);
-    sessionStorage.setItem('db9_api_url', apiUrl);
-    sessionStorage.setItem('db9_token', token);
-    sessionStorage.setItem('db9_db', db.id);
-    setState({
-      client,
+  const pickDatabase = useCallback((db: DatabaseInfo) => {
+    setState(s => ({
+      ...s,
+      phase: 'connected',
       databaseId: db.id,
       databaseName: db.name || db.id,
-      connected: true,
-    });
-    setError(null);
+    }));
   }, []);
 
-  const disconnect = useCallback(() => {
-    sessionStorage.removeItem('db9_token');
-    sessionStorage.removeItem('db9_db');
-    sessionStorage.removeItem('db9_api_url');
-    setState({ client: null, databaseId: '', databaseName: '', connected: false });
-    setDatabases([]);
-    setError(null);
-  }, []);
+  const switchDatabase = useCallback(async () => {
+    try {
+      const dbs = await client.listDatabases();
+      setState(s => ({ ...s, phase: 'pick-db', databases: dbs, error: null }));
+    } catch (err) {
+      setState(s => ({
+        ...s,
+        error: err instanceof Error ? err.message : String(err),
+      }));
+    }
+  }, [client]);
 
-  return { ...state, databases, loading, error, fetchDatabases, connect, disconnect };
+  return { ...state, pickDatabase, switchDatabase };
 }

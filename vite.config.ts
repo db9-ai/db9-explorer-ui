@@ -6,11 +6,22 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      // In production, `db9 explore` runs the proxy.
+      // In development, Vite proxies /api → api.db9.ai with
+      // DB9_TOKEN injected as Authorization header.
       '/api': {
-        target: 'https://api.db9.ai',
+        target: process.env.DB9_API_URL || 'https://api.db9.ai',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
         secure: true,
+        configure: (proxy) => {
+          const token = process.env.DB9_TOKEN;
+          if (token) {
+            proxy.on('proxyReq', (proxyReq) => {
+              proxyReq.setHeader('Authorization', `Bearer ${token}`);
+            });
+          }
+        },
       },
     },
   },

@@ -31,21 +31,19 @@ export class Db9Error extends Error {
   }
 }
 
+/**
+ * HTTP client for the db9 Customer API.
+ *
+ * All requests go to `/api/...` — the local proxy (`db9 explore`)
+ * injects `Authorization: Bearer <token>` server-side, so the
+ * browser never touches credentials.
+ */
 export class Db9Client {
-  private apiUrl: string;
-  private token: string;
-
-  constructor(apiUrl: string, token: string) {
-    this.apiUrl = apiUrl.replace(/\/+$/, '');
-    this.token = token;
-  }
-
   private async fetch<T>(path: string, init?: RequestInit): Promise<T> {
-    const resp = await fetch(`${this.apiUrl}${path}`, {
+    const resp = await fetch(`/api${path}`, {
       ...init,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.token}`,
         ...(init?.headers || {}),
       },
     });
@@ -63,6 +61,10 @@ export class Db9Client {
   async listDatabases(): Promise<DatabaseInfo[]> {
     const dbs = await this.fetch<DatabaseInfo[]>('/customer/databases');
     return dbs.filter(db => db.state === 'ACTIVE');
+  }
+
+  async getDatabase(dbIdOrName: string): Promise<DatabaseInfo> {
+    return this.fetch<DatabaseInfo>(`/customer/databases/${encodeURIComponent(dbIdOrName)}`);
   }
 
   async sql(databaseId: string, query: string): Promise<SqlResult> {

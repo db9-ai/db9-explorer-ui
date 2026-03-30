@@ -19,7 +19,7 @@ interface Props {
   client: Db9Client;
   databaseId: string;
   databaseName: string;
-  onDisconnect: () => void;
+  onSwitchDatabase: () => void;
 }
 
 type DialogState =
@@ -35,7 +35,7 @@ interface ContextMenuState {
   entry: FileInfo;
 }
 
-export function Explorer({ client, databaseId, databaseName, onDisconnect }: Props) {
+export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }: Props) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('files');
   const fs = useFileSystem(client, databaseId);
   const [dialog, setDialog] = useState<DialogState>({ type: 'none' });
@@ -173,8 +173,8 @@ export function Explorer({ client, databaseId, databaseName, onDisconnect }: Pro
               <RefreshIcon />
             </button>
           )}
-          <button className="btn-disconnect" onClick={onDisconnect}>
-            Disconnect
+          <button className="btn-disconnect" onClick={onSwitchDatabase}>
+            Switch DB
           </button>
         </div>
       </div>

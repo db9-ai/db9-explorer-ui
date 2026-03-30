@@ -1,18 +1,43 @@
 import { useConnection } from './hooks/useConnection';
-import { ConnectPanel } from './components/ConnectPanel';
+import { DatabasePicker } from './components/ConnectPanel';
 import { Explorer } from './components/Explorer';
 
 export default function App() {
   const conn = useConnection();
 
-  if (!conn.connected || !conn.client) {
+  if (conn.phase === 'loading') {
     return (
-      <ConnectPanel
+      <div className="connect-screen">
+        <div className="connect-card">
+          <div className="connect-title">
+            <span>db<span className="dim">9</span></span>
+            <span className="dim">Explorer</span>
+          </div>
+          <div className="connect-subtitle">Connecting…</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (conn.phase === 'error') {
+    return (
+      <div className="connect-screen">
+        <div className="connect-card">
+          <div className="connect-title">
+            <span>db<span className="dim">9</span></span>
+            <span className="dim">Explorer</span>
+          </div>
+          <div className="connect-error">{conn.error}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (conn.phase === 'pick-db') {
+    return (
+      <DatabasePicker
         databases={conn.databases}
-        loading={conn.loading}
-        error={conn.error}
-        onFetchDatabases={conn.fetchDatabases}
-        onConnect={conn.connect}
+        onPick={conn.pickDatabase}
       />
     );
   }
@@ -22,7 +47,7 @@ export default function App() {
       client={conn.client}
       databaseId={conn.databaseId}
       databaseName={conn.databaseName}
-      onDisconnect={conn.disconnect}
+      onSwitchDatabase={conn.switchDatabase}
     />
   );
 }
