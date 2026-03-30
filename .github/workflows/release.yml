@@ -3,9 +3,15 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: "Version tag (e.g. 0.1.0)"
+      bump:
+        description: "Version bump type"
         required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
 
 jobs:
   release:
@@ -21,12 +27,27 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Bump version
+        id: version
+        run: |
+          npm version ${{ inputs.bump }} --no-git-tag-version
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "release: v${{ steps.version.outputs.version }}"
+          git push
+
       - run: npm ci
       - run: npm run build
 
       - name: Package dist
         run: |
-          echo "${{ inputs.version }}" > dist/version.txt
+          echo "${{ steps.version.outputs.version }}" > dist/version.txt
           tar -czf explorer.tar.gz -C dist .
           sha256sum explorer.tar.gz > explorer.tar.gz.sha256
 
@@ -34,8 +55,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "v${{ inputs.version }}" \
-            --title "v${{ inputs.version }}" \
+          gh release create "v${{ steps.version.outputs.version }}" \
+            --title "v${{ steps.version.outputs.version }}" \
             --generate-notes \
             explorer.tar.gz \
             explorer.tar.gz.sha256
