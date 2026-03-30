@@ -32,6 +32,20 @@ export class Db9Error extends Error {
 }
 
 /**
+ * Detect whether we are running under `db9 explore` local proxy.
+ * The CLI injects a per-session secret into index.html by replacing
+ * the `__DB9_LOCAL_SECRET__` placeholder. If the value is still the
+ * literal placeholder, we are NOT running under the local proxy.
+ */
+function getSessionSecret(): string | null {
+  const secret = (window as unknown as Record<string, unknown>).__DB9_SESSION_SECRET__;
+  if (typeof secret === 'string' && secret !== '__DB9_LOCAL_SECRET__') {
+    return secret;
+  }
+  return null;
+}
+
+/**
  * HTTP client for the db9 Customer API.
  *
  * All requests go to `/api/...` — the local proxy (`db9 explore`)
@@ -40,12 +54,17 @@ export class Db9Error extends Error {
  */
 export class Db9Client {
   private async fetch<T>(path: string, init?: RequestInit): Promise<T> {
+    const sessionSecret = getSessionSecret();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(init?.headers as Record<string, string> || {}),
+    };
+    if (sessionSecret) {
+      headers['X-DB9-Session'] = sessionSecret;
+    }
     const resp = await fetch(`/api${path}`, {
       ...init,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(init?.headers || {}),
-      },
+      headers,
     });
     if (!resp.ok) {
       let msg = resp.statusText;
