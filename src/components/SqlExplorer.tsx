@@ -16,14 +16,47 @@ interface HistoryEntry {
   durationMs?: number;
 }
 
+const HISTORY_KEY = 'db9-sql-history';
+const MAX_HISTORY = 200;
+
+function loadHistory(): HistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return [];
+}
+
+function saveHistory(entries: HistoryEntry[]) {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(entries.slice(0, MAX_HISTORY)));
+  } catch { /* ignore */ }
+}
+
 export function SqlExplorer({ client, databaseId }: Props) {
   const [query, setQuery] = useState('SELECT 1;');
   const [result, setResult] = useState<SqlResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [history, setHistory] = useState<HistoryEntry[]>(loadHistory);
   const [showHistory, setShowHistory] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const historyFilterRef = useRef<HTMLInputElement>(null);
+
+  // Persist history to localStorage
+  useEffect(() => {
+    saveHistory(history);
+  }, [history]);
+
+  // Focus filter when history opens
+  useEffect(() => {
+    if (showHistory) {
+      historyFilterRef.current?.focus();
+    } else {
+      setHistoryFilter('');
+    }
+  }, [showHistory]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -51,12 +84,12 @@ export function SqlExplorer({ client, databaseId }: Props) {
         setError(msg);
         setHistory(prev => [{
           query: trimmed, timestamp: Date.now(), success: false, error: msg, durationMs,
-        }, ...prev].slice(0, 50));
+        }, ...prev].slice(0, MAX_HISTORY));
       } else {
         setResult(res);
         setHistory(prev => [{
           query: trimmed, timestamp: Date.now(), success: true, rowCount: res.row_count, durationMs,
-        }, ...prev].slice(0, 50));
+        }, ...prev].slice(0, MAX_HISTORY));
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -64,7 +97,7 @@ export function SqlExplorer({ client, databaseId }: Props) {
       setHistory(prev => [{
         query: trimmed, timestamp: Date.now(), success: false, error: msg,
         durationMs: Math.round(performance.now() - start),
-      }, ...prev].slice(0, 50));
+      }, ...prev].slice(0, MAX_HISTORY));
     } finally {
       setRunning(false);
     }
@@ -129,27 +162,60 @@ export function SqlExplorer({ client, databaseId }: Props) {
         </div>
 
         {/* History dropdown */}
-        {showHistory && history.length > 0 && (
+        {showHistory && (
           <div className="sql-history">
-            <div className="sql-history-header">Recent Queries</div>
-            {history.map((entry, i) => (
-              <div
-                key={i}
-                className="sql-history-item"
-                onClick={() => loadFromHistory(entry)}
-              >
-                <div className="sql-history-query">{entry.query}</div>
-                <div className="sql-history-meta">
-                  <span className={entry.success ? 'sql-ok' : 'sql-err'}>
-                    {entry.success ? `${entry.rowCount} rows` : 'error'}
-                  </span>
-                  {entry.durationMs !== undefined && (
-                    <span>{entry.durationMs}ms</span>
-                  )}
-                  <span>{formatTimeAgo(entry.timestamp)}</span>
-                </div>
-              </div>
-            ))}
+            <div className="sql-history-header">
+              <input
+                ref={historyFilterRef}
+                className="sql-history-filter"
+                type="text"
+                value={historyFilter}
+                onChange={e => setHistoryFilter(e.target.value)}
+                placeholder="Filter history…"
+              />
+              {history.length > 0 && (
+                <button
+                  className="btn-sm btn-secondary"
+                  style={{ fontSize: 10, flexShrink: 0 }}
+                  onClick={() => { setHistory([]); setHistoryFilter(''); }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            {history.length === 0 ? (
+              <div className="sql-history-empty">No queries yet</div>
+            ) : (
+              (() => {
+                const filtered = historyFilter.trim()
+                  ? history.filter(e =>
+                      e.query.toLowerCase().includes(historyFilter.toLowerCase())
+                    )
+                  : history;
+                return filtered.length === 0 ? (
+                  <div className="sql-history-empty">No matching queries</div>
+                ) : (
+                  filtered.map((entry, i) => (
+                    <div
+                      key={i}
+                      className="sql-history-item"
+                      onClick={() => loadFromHistory(entry)}
+                    >
+                      <div className="sql-history-query">{entry.query}</div>
+                      <div className="sql-history-meta">
+                        <span className={entry.success ? 'sql-ok' : 'sql-err'}>
+                          {entry.success ? `${entry.rowCount} rows` : 'error'}
+                        </span>
+                        {entry.durationMs !== undefined && (
+                          <span>{entry.durationMs}ms</span>
+                        )}
+                        <span>{formatTimeAgo(entry.timestamp)}</span>
+                      </div>
+                    </div>
+                  ))
+                );
+              })()
+            )}
           </div>
         )}
 
