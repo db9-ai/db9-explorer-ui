@@ -64,16 +64,17 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
   }, [fs]);
 
   // Cmd+P: Quick Open (global shortcut)
-  useEffect(() => {
-    const handleCmdP = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
-        e.preventDefault();
-        setShowQuickOpen(prev => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleCmdP);
-    return () => window.removeEventListener('keydown', handleCmdP);
-  }, []);
+  // TODO: disabled until db9-server supports fs9_search() — see c4pt0r/db9-server#2251
+  // useEffect(() => {
+  //   const handleCmdP = (e: KeyboardEvent) => {
+  //     if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
+  //       e.preventDefault();
+  //       setShowQuickOpen(prev => !prev);
+  //     }
+  //   };
+  //   window.addEventListener('keydown', handleCmdP);
+  //   return () => window.removeEventListener('keydown', handleCmdP);
+  // }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
