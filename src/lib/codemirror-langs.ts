@@ -23,8 +23,8 @@ const LANG_MAP: Record<string, LangLoader> = {
   // Python
   py:   () => import('@codemirror/lang-python').then(m => m.python()),
 
-  // SQL
-  sql:  () => import('@codemirror/lang-sql').then(m => m.sql()),
+  // SQL (PostgreSQL dialect)
+  sql:  () => import('@codemirror/lang-sql').then(m => m.sql({ dialect: m.PostgreSQL })),
 
   // JSON
   json:  () => import('@codemirror/lang-json').then(m => m.json()),
@@ -75,6 +75,15 @@ const LANG_MAP: Record<string, LangLoader> = {
   bash: shellLang,
   zsh:  shellLang,
 };
+
+/**
+ * Returns PostgreSQL SQL language support (for the SQL editor).
+ */
+export function getPostgresLanguage(): Promise<LanguageSupport> {
+  return import('@codemirror/lang-sql').then(m =>
+    m.sql({ dialect: m.PostgreSQL, upperCaseKeywords: true })
+  );
+}
 
 /**
  * Returns a LanguageSupport for the given filename, or null if unknown.

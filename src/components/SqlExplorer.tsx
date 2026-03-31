@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { Db9Client, SqlResult } from '../lib/db9-client';
 import { SchemaSidebar } from './SchemaSidebar';
+import { SqlCodeMirror } from './SqlCodeMirror';
 
 interface Props {
   client: Db9Client;
@@ -41,7 +42,6 @@ export function SqlExplorer({ client, databaseId }: Props) {
   const [history, setHistory] = useState<HistoryEntry[]>(loadHistory);
   const [showHistory, setShowHistory] = useState(false);
   const [historyFilter, setHistoryFilter] = useState('');
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const historyFilterRef = useRef<HTMLInputElement>(null);
 
   // Persist history to localStorage
@@ -57,14 +57,6 @@ export function SqlExplorer({ client, databaseId }: Props) {
       setHistoryFilter('');
     }
   }, [showHistory]);
-
-  // Auto-resize textarea
-  useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = Math.max(120, Math.min(el.scrollHeight, 400)) + 'px';
-  }, [query]);
 
   const executeQuery = useCallback(async () => {
     const trimmed = query.trim();
@@ -103,22 +95,13 @@ export function SqlExplorer({ client, databaseId }: Props) {
     }
   }, [client, databaseId, query, running]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      e.preventDefault();
-      executeQuery();
-    }
-  }, [executeQuery]);
-
   const loadFromHistory = useCallback((entry: HistoryEntry) => {
     setQuery(entry.query);
     setShowHistory(false);
-    textareaRef.current?.focus();
   }, []);
 
   const handleInsertQuery = useCallback((sql: string) => {
     setQuery(sql);
-    textareaRef.current?.focus();
   }, []);
 
   return (
@@ -150,14 +133,11 @@ export function SqlExplorer({ client, databaseId }: Props) {
               </button>
             </div>
           </div>
-          <textarea
-            ref={textareaRef}
-            className="sql-textarea"
+          <SqlCodeMirror
             value={query}
-            onChange={e => setQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
+            onChange={setQuery}
+            onExecute={executeQuery}
             placeholder="SELECT * FROM ..."
-            spellCheck={false}
           />
         </div>
 
