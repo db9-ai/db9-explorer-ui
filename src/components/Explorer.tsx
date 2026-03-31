@@ -45,14 +45,8 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
 
   useEffect(() => { fs.initRoot(); }, []);// eslint-disable-line react-hooks/exhaustive-deps
 
-  // Track when a file is selected for viewing
-  useEffect(() => {
-    if (fs.selectedFile && fs.selectedFile.type === 'file') {
-      setShowViewer(true);
-    }
-  }, [fs.selectedFile]);
-
   const handleSelectEntry = useCallback((entry: FileInfo) => {
+    // Single-click: select only (highlight), don't open
     fs.selectEntry(entry);
   }, [fs]);
 
@@ -61,7 +55,9 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
       const dirPath = entry.path.endsWith('/') ? entry.path : entry.path + '/';
       fs.navigateTo(dirPath);
     } else {
+      // Double-click file: select + open viewer
       fs.selectEntry(entry);
+      setShowViewer(true);
     }
   }, [fs]);
 

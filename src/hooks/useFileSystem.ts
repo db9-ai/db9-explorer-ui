@@ -68,6 +68,7 @@ export function useFileSystem(client: Db9Client | null, databaseId: string) {
     if (entry.type === 'dir') {
       const dirPath = entry.path.endsWith('/') ? entry.path : entry.path + '/';
       if (viewMode === 'column') {
+        // Column view: single-click expands the next column
         try {
           const entries = await loadDirectory(dirPath);
           setColumns(prev => {
@@ -78,16 +79,16 @@ export function useFileSystem(client: Db9Client | null, databaseId: string) {
             next.push({ path: dirPath, entries });
             return next;
           });
-          setSelectedFile(entry);
-          setFileContent(null);
         } catch (err) {
           setError(err instanceof Error ? err.message : String(err));
         }
-      } else {
-        await navigateTo(dirPath);
       }
+      // All modes: just select (highlight), don't navigate
+      setSelectedFile(entry);
+      setFileContent(null);
     } else {
       setSelectedFile(entry);
+      setFileContent(null);
       setError(null);
       try {
         const content = await client.readFile(databaseId, entry.path);
@@ -97,7 +98,7 @@ export function useFileSystem(client: Db9Client | null, databaseId: string) {
         setError(err instanceof Error ? err.message : String(err));
       }
     }
-  }, [client, databaseId, viewMode, loadDirectory, navigateTo]);
+  }, [client, databaseId, viewMode, loadDirectory]);
 
   const expandTreeNode = useCallback(async (path: string) => {
     if (!client) return;
