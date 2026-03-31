@@ -2,7 +2,8 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useLocation, useNavigate, useBlocker } from 'react-router-dom';
 import type { Db9Client, FileInfo } from '../lib/db9-client';
 import { useFileSystem } from '../hooks/useFileSystem';
-import { basename, joinPath, dirname } from '../lib/utils';
+import { basename, joinPath, dirname, isTextFile, formatSize } from '../lib/utils';
+import { useDropZone, type UploadProgress } from '../hooks/useDropZone';
 import { ViewerSidebar } from './ViewerSidebar';
 import { Breadcrumb } from './Breadcrumb';
 import { Toolbar } from './Toolbar';
@@ -15,6 +16,8 @@ import { QuickOpen } from './QuickOpen';
 import { CreateDialog, DeleteDialog, DeleteMultiDialog, RenameDialog } from './Dialogs';
 import { ContextMenu, type ContextMenuItem } from './ContextMenu';
 import { RefreshIcon } from './Icons';
+
+const MAX_UPLOAD_SIZE = 1024 * 1024; // 1 MB per file
 
 interface Props {
   client: Db9Client;
@@ -45,11 +48,70 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [showQuickOpen, setShowQuickOpen] = useState(false);
   const [editorDirty, setEditorDirty] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
+  const mainContentRef = useRef<HTMLDivElement>(null);
 
   // --- Derive state from URL ---
   const activeTab = location.pathname.startsWith('/sql') ? 'sql' as const : 'files' as const;
   const showViewer = location.pathname.startsWith('/view/');
+
+  // --- Drag-and-drop upload ---
+  const handleDropUpload = useCallback(async (files: File[]) => {
+    const errors: string[] = [];
+    const validFiles: File[] = [];
+
+    for (const file of files) {
+      if (file.size > MAX_UPLOAD_SIZE) {
+        errors.push(`${file.name}: too large (${formatSize(file.size)}, max 1 MB). Use db9 CLI for large files.`);
+        continue;
+      }
+      if (!isTextFile(file.name)) {
+        errors.push(`${file.name}: binary files not supported in browser. Use db9 CLI.`);
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0 && errors.length > 0) {
+      alert(errors.join('\n'));
+      return;
+    }
+
+    const progress: UploadProgress = {
+      total: validFiles.length,
+      completed: 0,
+      current: validFiles[0]?.name || '',
+      errors,
+    };
+    setUploadProgress({ ...progress });
+
+    for (const file of validFiles) {
+      progress.current = file.name;
+      setUploadProgress({ ...progress });
+      try {
+        const text = await file.text();
+        await fs.createFile(joinPath(fs.currentPath, file.name), text);
+        progress.completed++;
+      } catch (err) {
+        progress.errors.push(`${file.name}: ${err instanceof Error ? err.message : String(err)}`);
+        progress.completed++;
+      }
+      setUploadProgress({ ...progress });
+    }
+
+    // Show errors if any, then clear
+    if (progress.errors.length > 0) {
+      alert(`Upload complete (${progress.completed - progress.errors.length}/${progress.total} succeeded)\n\n${progress.errors.join('\n')}`);
+    }
+    setUploadProgress(null);
+  }, [fs]);
+
+  const { isDragOver } = useDropZone({
+    containerRef: mainContentRef,
+    onUpload: handleDropUpload,
+    enabled: activeTab === 'files' && !showViewer,
+  });
 
   // Extract fs path from URL
   const getPathFromUrl = useCallback((): string => {
@@ -309,16 +371,12 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
   }, [client, databaseId, fs, dialog]);
 
   const handleUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const text = await file.text();
-      await fs.createFile(joinPath(fs.currentPath, file.name), text);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : String(err));
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      await handleDropUpload(files);
     }
     if (uploadRef.current) uploadRef.current.value = '';
-  }, [fs]);
+  }, [handleDropUpload]);
 
   const handleDownload = useCallback(() => {
     if (!fs.selectedFile || !fs.fileContent) return;
@@ -419,7 +477,7 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
         {activeTab === 'sql' ? (
           <SqlExplorer client={client} databaseId={databaseId} />
         ) : (
-        <div className="main-content">
+        <div className="main-content" ref={mainContentRef}>
           <Breadcrumb path={fs.currentPath} onNavigate={navigateToDir} />
           <Toolbar
             viewMode={fs.viewMode}
@@ -495,6 +553,32 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
               )}
             </>
           )}
+
+          {/* Drag-over overlay */}
+          {isDragOver && (
+            <div className="drop-overlay">
+              <div className="drop-overlay-content">
+                <div className="drop-overlay-icon">+</div>
+                <div className="drop-overlay-text">Drop files to upload</div>
+                <div className="drop-overlay-hint">Text files only, max 1 MB each</div>
+              </div>
+            </div>
+          )}
+
+          {/* Upload progress */}
+          {uploadProgress && (
+            <div className="upload-progress">
+              <div className="upload-progress-bar">
+                <div
+                  className="upload-progress-fill"
+                  style={{ width: `${(uploadProgress.completed / uploadProgress.total) * 100}%` }}
+                />
+              </div>
+              <div className="upload-progress-text">
+                Uploading {uploadProgress.current} ({uploadProgress.completed}/{uploadProgress.total})
+              </div>
+            </div>
+          )}
         </div>
         )}
       </div>
@@ -516,6 +600,7 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
       <input
         ref={uploadRef}
         type="file"
+        multiple
         style={{ display: 'none' }}
         onChange={handleUpload}
       />
