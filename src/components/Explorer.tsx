@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import type { Db9Client, FileInfo } from '../lib/db9-client';
 import { useFileSystem } from '../hooks/useFileSystem';
-import { basename, joinPath, dirname } from '../lib/utils';
+import { basename, joinPath, dirname, getFileIcon } from '../lib/utils';
 import { Breadcrumb } from './Breadcrumb';
 import { Toolbar } from './Toolbar';
 import { ListView } from './ListView';
@@ -370,22 +370,51 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
           />
 
           {showViewer && fs.selectedFile?.type === 'file' ? (
-            <>
-              <div style={{ padding: '4px 12px', borderBottom: '1px solid var(--border-subtle)' }}>
-                <button
-                  className="btn-sm btn-secondary"
-                  onClick={() => { setShowViewer(false); }}
-                  style={{ fontSize: 11 }}
-                >
-                  ← Back to listing
-                </button>
+            <div className="viewer-with-sidebar">
+              <div className="viewer-sidebar">
+                <div className="viewer-sidebar-header">
+                  <button
+                    className="viewer-back-btn"
+                    onClick={() => setShowViewer(false)}
+                    title="Back to listing"
+                  >
+                    ←
+                  </button>
+                  <span className="viewer-sidebar-title">
+                    {fs.currentPath === '/' ? '/' : basename(fs.currentPath.replace(/\/$/, ''))}
+                  </span>
+                </div>
+                <div className="viewer-sidebar-list">
+                  {fs.currentEntries.map(entry => {
+                    const name = basename(entry.path);
+                    const isActive = entry.path === fs.selectedFile?.path;
+                    return (
+                      <div
+                        key={entry.path}
+                        className={`viewer-sidebar-item ${isActive ? 'active' : ''} ${entry.type === 'dir' ? 'dir' : ''}`}
+                        onClick={() => {
+                          if (entry.type === 'dir') {
+                            const dirPath = entry.path.endsWith('/') ? entry.path : entry.path + '/';
+                            fs.navigateTo(dirPath);
+                            setShowViewer(false);
+                          } else {
+                            fs.selectEntry(entry);
+                          }
+                        }}
+                      >
+                        <span className="viewer-sidebar-icon">{getFileIcon(name, entry.type === 'dir')}</span>
+                        <span className="viewer-sidebar-name">{name}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
               <FileViewer
                 file={fs.selectedFile}
                 content={fs.fileContent}
                 onSave={fs.saveFile}
               />
-            </>
+            </div>
           ) : (
             <>
               {fs.viewMode === 'list' && (
