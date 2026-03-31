@@ -1,10 +1,17 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useConnection } from './hooks/useConnection';
 import { DatabasePicker } from './components/ConnectPanel';
 import { Explorer } from './components/Explorer';
+import type { DatabaseInfo } from './lib/db9-client';
 
 export default function App() {
   const conn = useConnection();
+  const navigate = useNavigate();
+
+  const handlePickDatabase = (db: DatabaseInfo) => {
+    conn.pickDatabase(db);
+    navigate(`/${db.id}/browse/`, { replace: true });
+  };
 
   if (conn.phase === 'loading') {
     return (
@@ -42,7 +49,7 @@ export default function App() {
     return (
       <DatabasePicker
         databases={conn.databases}
-        onPick={conn.pickDatabase}
+        onPick={handlePickDatabase}
       />
     );
   }
@@ -52,16 +59,17 @@ export default function App() {
       client={conn.client}
       databaseId={conn.databaseId}
       databaseName={conn.databaseName}
-      onSwitchDatabase={conn.switchDatabase}
+      onConnectDatabase={handlePickDatabase}
     />
   );
 
   return (
     <Routes>
-      <Route path="/sql" element={explorer} />
-      <Route path="/view/*" element={explorer} />
-      <Route path="/browse/*" element={explorer} />
-      <Route path="*" element={<Navigate to="/browse/" replace />} />
+      <Route path="/:dbId/sql" element={explorer} />
+      <Route path="/:dbId/view/*" element={explorer} />
+      <Route path="/:dbId/browse/*" element={explorer} />
+      <Route path="/:dbId" element={<Navigate to={`/${conn.databaseId}/browse/`} replace />} />
+      <Route path="*" element={<Navigate to={`/${conn.databaseId}/browse/`} replace />} />
     </Routes>
   );
 }

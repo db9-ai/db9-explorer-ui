@@ -1,0 +1,123 @@
+/* ── Connect Panel ───────────────────────────────── */
+
+.connect-screen {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background:
+    radial-gradient(ellipse 600px 400px at 50% 40%, hsl(210 30% 8%) 0%, transparent 100%),
+    var(--background);
+  animation: fadeIn 0.4s var(--ease-out);
+}
+
+.connect-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 36px;
+  box-shadow: var(--shadow-lg);
+  animation: scaleIn 0.35s var(--ease-out);
+  position: relative;
+  overflow: hidden;
+}
+/* Subtle top shine */
+.connect-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 10%, hsl(0 0% 100% / 0.1) 50%, transparent 90%);
+}
+
+.connect-title {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  letter-spacing: -0.03em;
+}
+.connect-title .dim { color: var(--muted-foreground); font-weight: 400; }
+
+.connect-subtitle {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  margin-bottom: 24px;
+}
+
+/* Database picker */
+.db-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.db-picker-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-out);
+  animation: fadeInUp 0.3s var(--ease-out) both;
+  position: relative;
+  overflow: hidden;
+}
+.db-picker-item:nth-child(1) { animation-delay: 0.05s; }
+.db-picker-item:nth-child(2) { animation-delay: 0.1s; }
+.db-picker-item:nth-child(3) { animation-delay: 0.15s; }
+.db-picker-item:nth-child(4) { animation-delay: 0.2s; }
+.db-picker-item:hover {
+  border-color: var(--selection-border);
+  background: var(--selection-bg);
+  transform: translateX(4px);
+  box-shadow: 0 2px 12px hsl(0 0% 0% / 0.2);
+}
+
+.db-picker-name { font-weight: 500; }
+.db-picker-id { color: var(--text-muted); font-size: 11px; }
+
+/* Hover shine effect on cards */
+.db-picker-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(0 0% 100% / 0.03),
+    transparent
+  );
+  transition: left 0.5s ease;
+}
+.db-picker-item:hover::before {
+  left: 100%;
+}
+
+.connect-error {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: var(--danger-bg);
+  border: 1px solid hsl(0 60% 30%);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--danger);
+  font-family: var(--font-mono);
+  animation: fadeInUp 0.2s var(--ease-out);
+}

@@ -115,6 +115,13 @@ export class Db9Client {
     return dbs.filter(db => db.state === 'ACTIVE');
   }
 
+  async createDatabase(name: string): Promise<DatabaseInfo> {
+    return this.fetch<DatabaseInfo>('/customer/databases', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+  }
+
   async getDatabase(dbIdOrName: string): Promise<DatabaseInfo> {
     return this.fetch<DatabaseInfo>(`/customer/databases/${encodeURIComponent(dbIdOrName)}`);
   }

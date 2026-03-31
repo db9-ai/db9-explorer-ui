@@ -1,0 +1,237 @@
+/* ── Viewer with Sidebar ────────────────────────── */
+
+.viewer-with-sidebar {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  animation: fadeIn 0.15s var(--ease-out);
+}
+
+.viewer-sidebar {
+  width: 220px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--card) 0%, hsl(0 0% 7%) 100%);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.viewer-sidebar-header {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.viewer-back-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--muted-foreground);
+  transition: all 0.15s var(--ease-out);
+  flex-shrink: 0;
+}
+.viewer-back-btn:hover {
+  background: var(--secondary);
+  color: var(--foreground);
+}
+.viewer-back-btn:active { transform: scale(0.92); }
+
+.viewer-sidebar-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viewer-sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.viewer-sidebar-item {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  gap: 8px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--soft-foreground);
+  transition: all 0.15s var(--ease-out);
+  white-space: nowrap;
+  user-select: none;
+}
+.viewer-sidebar-item:hover {
+  background: hsl(0 0% 100% / 0.05);
+}
+.viewer-sidebar-item.active {
+  background: var(--selection-bg);
+  box-shadow: inset 2px 0 0 var(--accent-blue);
+  color: var(--foreground);
+}
+.viewer-sidebar-item.dir {
+  color: var(--muted-foreground);
+}
+.viewer-sidebar-item.dir:hover {
+  color: var(--soft-foreground);
+}
+
+.viewer-sidebar-chevron {
+  font-size: 10px;
+  color: var(--terminal-accent);
+  flex-shrink: 0;
+  transition: transform 0.2s var(--spring);
+  width: 12px;
+  display: inline-flex;
+  align-items: center;
+}
+.viewer-sidebar-chevron.open {
+  transform: rotate(90deg);
+}
+.viewer-sidebar-chevron.spacer {
+  visibility: hidden;
+}
+
+.viewer-sidebar-icon {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.viewer-sidebar-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.viewer-sidebar-children {
+  animation: slideDown 0.15s var(--ease-out);
+}
+
+.viewer-sidebar-loading {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  height: 28px;
+  display: flex;
+  align-items: center;
+}
+
+/* ── File Viewer ─────────────────────────────────── */
+
+.file-viewer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.file-viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.file-viewer-title {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.file-viewer-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+}
+
+.file-viewer-body {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+.file-viewer-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ── CodeMirror container ──────────────────────── */
+
+.cm-container {
+  height: 100%;
+  animation: fadeIn 0.2s var(--ease-out);
+}
+
+.cm-container .cm-editor {
+  height: 100%;
+}
+
+.cm-container .cm-scroller {
+  overflow: auto;
+}
+
+/* Vim toggle button */
+.vim-toggle {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  min-width: 42px;
+  justify-content: center;
+}
+.vim-toggle.vim-active {
+  background: hsl(210 30% 15%);
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  box-shadow: 0 0 8px hsl(210 50% 40% / 0.2);
+}
+
+/* Vim status bar (command line, mode indicator) */
+.cm-panels .cm-vim-panel {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 3px 8px;
+  color: var(--muted-foreground);
+}
+.cm-panels .cm-vim-panel input {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--foreground);
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+/* ── Responsive: tight viewport ─────────────────── */
+
+@media (max-width: 768px) {
+  .viewer-sidebar { width: 180px; }
+  .file-viewer-header { padding: 6px 10px; }
+  .file-viewer-meta { gap: 10px; font-size: 10px; }
+}
+
+@media (max-width: 480px) {
+  .viewer-sidebar { width: 140px; }
+  .viewer-sidebar-item { font-size: 11px; height: 26px; padding: 0 8px; gap: 6px; }
+  .file-viewer-title { font-size: 12px; }
+  .file-viewer-header { padding: 5px 8px; }
+}

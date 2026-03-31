@@ -1,7 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createHashRouter, RouterProvider } from 'react-router-dom'
-import './styles/global.css'
+import './styles/index.css'
 import App from './App'
 
 const router = createHashRouter([

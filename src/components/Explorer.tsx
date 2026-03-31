@@ -15,6 +15,8 @@ import { SqlExplorer } from './SqlExplorer';
 import { QuickOpen } from './QuickOpen';
 import { CreateDialog, DeleteDialog, DeleteMultiDialog, RenameDialog } from './Dialogs';
 import { ContextMenu, type ContextMenuItem } from './ContextMenu';
+import { DatabaseSwitcher } from './DatabaseSwitcher';
+import type { DatabaseInfo } from '../lib/db9-client';
 import { RefreshIcon } from './Icons';
 
 const MAX_UPLOAD_SIZE = 1024 * 1024; // 1 MB per file
@@ -23,7 +25,7 @@ interface Props {
   client: Db9Client;
   databaseId: string;
   databaseName: string;
-  onSwitchDatabase: () => void;
+  onConnectDatabase: (db: DatabaseInfo) => void;
 }
 
 type DialogState =
@@ -40,21 +42,22 @@ interface ContextMenuState {
   entry: FileInfo;
 }
 
-export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }: Props) {
+export function Explorer({ client, databaseId, databaseName, onConnectDatabase }: Props) {
   const location = useLocation();
   const navigate = useNavigate();
   const fs = useFileSystem(client, databaseId);
   const [dialog, setDialog] = useState<DialogState>({ type: 'none' });
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [showQuickOpen, setShowQuickOpen] = useState(false);
+  const [showDbSwitcher, setShowDbSwitcher] = useState(false);
   const [editorDirty, setEditorDirty] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
   const mainContentRef = useRef<HTMLDivElement>(null);
 
   // --- Derive state from URL ---
-  const activeTab = location.pathname.startsWith('/sql') ? 'sql' as const : 'files' as const;
-  const showViewer = location.pathname.startsWith('/view/');
+  const activeTab = location.pathname.startsWith(`/${databaseId}/sql`) ? 'sql' as const : 'files' as const;
+  const showViewer = location.pathname.startsWith(`/${databaseId}/view/`);
 
   // --- Drag-and-drop upload ---
   const handleDropUpload = useCallback(async (files: File[]) => {
@@ -113,29 +116,34 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
     enabled: activeTab === 'files' && !showViewer,
   });
 
-  // Extract fs path from URL
+  // URL prefix for this database
+  const dbPrefix = `/${databaseId}`;
+
+  // Extract fs path from URL (strip /:dbId/browse/ or /:dbId/view/)
   const getPathFromUrl = useCallback((): string => {
-    if (location.pathname.startsWith('/browse/')) {
-      return '/' + location.pathname.slice('/browse/'.length);
+    const browsePrefix = `${dbPrefix}/browse/`;
+    const viewPrefix = `${dbPrefix}/view/`;
+    if (location.pathname.startsWith(browsePrefix)) {
+      return '/' + location.pathname.slice(browsePrefix.length);
     }
-    if (location.pathname.startsWith('/view/')) {
-      return '/' + location.pathname.slice('/view/'.length);
+    if (location.pathname.startsWith(viewPrefix)) {
+      return '/' + location.pathname.slice(viewPrefix.length);
     }
     return '/';
-  }, [location.pathname]);
+  }, [location.pathname, dbPrefix]);
 
   const currentFsPath = getPathFromUrl();
 
   // --- Navigation helpers (push to router) ---
   const navigateToDir = useCallback((dirPath: string) => {
     const clean = dirPath.startsWith('/') ? dirPath : '/' + dirPath;
-    navigate('/browse' + clean);
-  }, [navigate]);
+    navigate(dbPrefix + '/browse' + clean);
+  }, [navigate, dbPrefix]);
 
   const navigateToFile = useCallback((filePath: string) => {
     const clean = filePath.startsWith('/') ? filePath : '/' + filePath;
-    navigate('/view' + clean);
-  }, [navigate]);
+    navigate(dbPrefix + '/view' + clean);
+  }, [navigate, dbPrefix]);
 
   // --- Block navigation when editor is dirty ---
   const blocker = useBlocker(editorDirty);
@@ -191,12 +199,13 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
     }
   }, [currentFsPath, showViewer, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Init root on mount
+  // Init root on mount and when database changes
   useEffect(() => {
-    if (activeTab === 'files' && !showViewer && currentFsPath === '/') {
-      fs.initRoot();
+    fs.initRoot();
+    if (activeTab === 'files' && !showViewer) {
+      navigate(dbPrefix + '/browse/', { replace: true });
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [databaseId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelectEntry = useCallback((entry: FileInfo, e: React.MouseEvent) => {
     fs.selectEntry(entry, { metaKey: e.metaKey || e.ctrlKey, shiftKey: e.shiftKey });
@@ -455,7 +464,7 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
           </button>
           <button
             className={`app-tab ${activeTab === 'sql' ? 'active' : ''}`}
-            onClick={() => navigate('/sql')}
+            onClick={() => navigate(dbPrefix + '/sql')}
           >
             SQL
           </button>
@@ -467,7 +476,7 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
               <RefreshIcon />
             </button>
           )}
-          <button className="btn-disconnect" onClick={onSwitchDatabase}>
+          <button className="btn-disconnect" onClick={() => setShowDbSwitcher(true)}>
             Switch DB
           </button>
         </div>
@@ -520,6 +529,10 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
                 onSave={fs.saveFile}
                 onDirtyChange={setEditorDirty}
               />
+            </div>
+          ) : fs.loading ? (
+            <div className="empty-state">
+              <div className="spinner" />
             </div>
           ) : (
             <>
@@ -652,6 +665,19 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
           databaseId={databaseId}
           onSelect={handleQuickOpen}
           onClose={() => setShowQuickOpen(false)}
+        />
+      )}
+
+      {/* Database Switcher */}
+      {showDbSwitcher && (
+        <DatabaseSwitcher
+          client={client}
+          currentDatabaseId={databaseId}
+          onSwitch={(db) => {
+            setShowDbSwitcher(false);
+            onConnectDatabase(db);
+          }}
+          onClose={() => setShowDbSwitcher(false)}
         />
       )}
 

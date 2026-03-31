@@ -29,16 +29,16 @@ export function Toolbar({
     <div className="toolbar">
       <div className="toolbar-group">
         <button className="toolbar-btn" onClick={onNewFile} title="New File">
-          <PlusIcon /> File
+          <PlusIcon /> <span className="toolbar-label">File</span>
         </button>
         <button className="toolbar-btn" onClick={onNewFolder} title="New Folder">
-          <FolderPlusIcon /> Folder
+          <FolderPlusIcon /> <span className="toolbar-label">Folder</span>
         </button>
       </div>
       <div className="toolbar-sep" />
       <div className="toolbar-group">
         <button className="toolbar-btn" onClick={onUpload} title="Upload">
-          <UploadIcon /> Upload
+          <UploadIcon /> <span className="toolbar-label">Upload</span>
         </button>
         {singleFileSelected && (
           <button className="toolbar-btn" onClick={onDownload} title="Download">

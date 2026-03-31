@@ -26,8 +26,8 @@ export function ListView({ entries, selectedPaths, onSelect, onDoubleClick, onCo
       <div className="file-list-header">
         <span>Name</span>
         <span className="right">Size</span>
-        <span>Modified</span>
-        <span>Type</span>
+        <span className="col-modified">Modified</span>
+        <span className="col-type">Type</span>
       </div>
       {entries.length === 0 ? (
         <div className="empty-state">
@@ -51,8 +51,8 @@ export function ListView({ entries, selectedPaths, onSelect, onDoubleClick, onCo
                 <span className="name">{name}</span>
               </div>
               <div className="file-list-cell right">{isDir ? '—' : formatSize(entry.size)}</div>
-              <div className="file-list-cell">{formatDate(entry.mtime)}</div>
-              <div className="file-list-cell">{isDir ? 'Folder' : name.split('.').pop() || 'File'}</div>
+              <div className="file-list-cell col-modified">{formatDate(entry.mtime)}</div>
+              <div className="file-list-cell col-type">{isDir ? 'Folder' : name.split('.').pop() || 'File'}</div>
             </div>
           );
         })

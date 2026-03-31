@@ -46,13 +46,19 @@ export function useConnection() {
 
     // Clean URL params
     if (dbParam) {
-      window.history.replaceState({}, '', window.location.pathname);
+      window.history.replaceState({}, '', window.location.pathname + window.location.hash);
     }
 
+    // Try to read dbId from hash URL: /#/<dbId>/browse/...
+    const hashPath = window.location.hash.replace(/^#/, '');
+    const hashDbId = hashPath.split('/').filter(Boolean)[0] || '';
+
+    // Priority: ?db= param > hash URL dbId
+    const targetDb = dbParam || hashDbId;
+
     try {
-      // If ?db= is provided, try to connect directly
-      if (dbParam) {
-        const db = await client.getDatabase(dbParam);
+      if (targetDb) {
+        const db = await client.getDatabase(targetDb);
         setState(s => ({
           ...s,
           phase: 'connected',
@@ -82,6 +88,26 @@ export function useConnection() {
       // Multiple databases — let user pick
       setState(s => ({ ...s, phase: 'pick-db', databases: dbs }));
     } catch (err) {
+      // If hash dbId failed, fall back to listing databases
+      if (hashDbId && !dbParam) {
+        try {
+          const dbs = await client.listDatabases();
+          if (dbs.length === 0) {
+            setState(s => ({ ...s, phase: 'error', error: 'No active databases found.' }));
+          } else if (dbs.length === 1) {
+            setState(s => ({
+              ...s,
+              phase: 'connected',
+              databases: dbs,
+              databaseId: dbs[0].id,
+              databaseName: dbs[0].name || dbs[0].id,
+            }));
+          } else {
+            setState(s => ({ ...s, phase: 'pick-db', databases: dbs }));
+          }
+          return;
+        } catch { /* fall through */ }
+      }
       setState(s => ({
         ...s,
         phase: 'error',
