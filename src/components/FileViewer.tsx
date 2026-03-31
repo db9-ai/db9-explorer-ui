@@ -105,8 +105,14 @@ export function FileViewer({ file, content, onSave, onDirtyChange }: Props) {
                 </button>
               </>
             ) : (
-              canEdit && content !== null && (
-                <button className="btn-sm btn-secondary" onClick={handleEdit}>Edit</button>
+              canEdit && (
+                <button
+                  className="btn-sm btn-secondary"
+                  onClick={handleEdit}
+                  style={content === null ? { visibility: 'hidden' } : undefined}
+                >
+                  Edit
+                </button>
               )
             )}
           </div>
