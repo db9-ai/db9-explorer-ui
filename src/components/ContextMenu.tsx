@@ -2,7 +2,10 @@ import { useEffect, useRef } from 'react';
 
 export interface ContextMenuItem {
   label: string;
+  shortcut?: string;
   danger?: boolean;
+  disabled?: boolean;
+  separator?: boolean;
   onClick: () => void;
 }
 
@@ -34,22 +37,35 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
   }, [onClose]);
 
   // Keep menu within viewport
+  const visibleItems = items.filter(i => !i.separator);
   const style: React.CSSProperties = {
-    left: Math.min(x, window.innerWidth - 180),
-    top: Math.min(y, window.innerHeight - items.length * 34 - 8),
+    left: Math.min(x, window.innerWidth - 200),
+    top: Math.min(y, window.innerHeight - visibleItems.length * 34 - 8),
   };
 
   return (
     <div className="context-menu" ref={ref} style={style}>
-      {items.map((item, i) => (
-        <div
-          key={i}
-          className={`context-menu-item ${item.danger ? 'danger' : ''}`}
-          onClick={() => { item.onClick(); onClose(); }}
-        >
-          {item.label}
-        </div>
-      ))}
+      {items.map((item, i) => {
+        if (item.separator) {
+          return <div key={i} className="context-menu-sep" />;
+        }
+        return (
+          <div
+            key={i}
+            className={`context-menu-item ${item.danger ? 'danger' : ''} ${item.disabled ? 'disabled' : ''}`}
+            onClick={() => {
+              if (item.disabled) return;
+              item.onClick();
+              onClose();
+            }}
+          >
+            <span>{item.label}</span>
+            {item.shortcut && (
+              <span className="context-menu-shortcut">{item.shortcut}</span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

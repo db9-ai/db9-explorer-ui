@@ -858,6 +858,7 @@ button { cursor: pointer; }
 .context-menu-item {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   height: 30px;
   padding: 0 10px;
@@ -866,6 +867,15 @@ button { cursor: pointer; }
   color: var(--soft-foreground);
   cursor: pointer;
   transition: background 0.1s;
+}
+.context-menu-item.disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.context-menu-shortcut {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 16px;
 }
 .context-menu-item:hover {
   background: hsl(0 0% 100% / 0.06);

@@ -140,6 +140,14 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
           }
           break;
         }
+        case 'F2': {
+          // Rename selected item
+          if (fs.selectedFile && fs.selectedPaths.size === 1) {
+            e.preventDefault();
+            setDialog({ type: 'rename', entry: fs.selectedFile });
+          }
+          break;
+        }
         case 'Escape': {
           fs.clearSelection();
           break;
@@ -239,10 +247,45 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
     URL.revokeObjectURL(url);
   }, [fs.selectedFile, fs.fileContent]);
 
+  const handleCopyPath = useCallback((path: string) => {
+    navigator.clipboard.writeText(path).catch(() => {
+      // Fallback for non-HTTPS contexts
+      const input = document.createElement('input');
+      input.value = path;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+    });
+  }, []);
+
   const contextMenuItems: ContextMenuItem[] = contextMenu ? [
-    { label: 'Open', onClick: () => handleDoubleClick(contextMenu.entry) },
-    { label: 'Rename...', onClick: () => setDialog({ type: 'rename', entry: contextMenu.entry }) },
-    { label: 'Delete', danger: true, onClick: () => setDialog({ type: 'delete', entry: contextMenu.entry }) },
+    {
+      label: 'Open',
+      shortcut: '↩',
+      onClick: () => handleDoubleClick(contextMenu.entry),
+    },
+    { label: '', separator: true, onClick: () => {} },
+    {
+      label: 'Copy Path',
+      onClick: () => handleCopyPath(contextMenu.entry.path),
+    },
+    {
+      label: 'Copy Name',
+      onClick: () => handleCopyPath(basename(contextMenu.entry.path)),
+    },
+    { label: '', separator: true, onClick: () => {} },
+    {
+      label: 'Rename…',
+      shortcut: 'F2',
+      onClick: () => setDialog({ type: 'rename', entry: contextMenu.entry }),
+    },
+    {
+      label: 'Delete',
+      shortcut: '⌫',
+      danger: true,
+      onClick: () => setDialog({ type: 'delete', entry: contextMenu.entry }),
+    },
   ] : [];
 
   return (
