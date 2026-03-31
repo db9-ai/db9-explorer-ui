@@ -61,6 +61,96 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
     }
   }, [fs]);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    if (activeTab !== 'files' || showViewer || dialog.type !== 'none') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't handle when typing in inputs
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      const entries = fs.currentEntries;
+      const selectedIdx = fs.selectedFile
+        ? entries.findIndex(en => en.path === fs.selectedFile!.path)
+        : -1;
+
+      switch (e.key) {
+        case 'ArrowDown': {
+          e.preventDefault();
+          const nextIdx = selectedIdx < entries.length - 1 ? selectedIdx + 1 : 0;
+          if (entries[nextIdx]) {
+            fs.selectEntry(entries[nextIdx], { shiftKey: e.shiftKey });
+          }
+          break;
+        }
+        case 'ArrowUp': {
+          e.preventDefault();
+          const prevIdx = selectedIdx > 0 ? selectedIdx - 1 : entries.length - 1;
+          if (entries[prevIdx]) {
+            fs.selectEntry(entries[prevIdx], { shiftKey: e.shiftKey });
+          }
+          break;
+        }
+        case 'Enter': {
+          e.preventDefault();
+          if (fs.selectedFile) {
+            handleDoubleClick(fs.selectedFile);
+          }
+          break;
+        }
+        case 'Backspace':
+        case 'Delete': {
+          if (fs.selectedPaths.size > 0) {
+            e.preventDefault();
+            if (fs.selectedPaths.size > 1) {
+              setDialog({ type: 'delete-multi', count: fs.selectedPaths.size });
+            } else if (fs.selectedFile) {
+              setDialog({ type: 'delete', entry: fs.selectedFile });
+            }
+          }
+          break;
+        }
+        case 'a': {
+          // Cmd+A: select all
+          if (e.metaKey || e.ctrlKey) {
+            e.preventDefault();
+            const allPaths = new Set(entries.map(en => en.path));
+            fs.selectAll(allPaths);
+          }
+          break;
+        }
+        case 'ArrowLeft': {
+          // Navigate to parent directory
+          if (fs.currentPath !== '/') {
+            e.preventDefault();
+            const parent = dirname(fs.currentPath.replace(/\/$/, ''));
+            fs.navigateTo(parent.endsWith('/') ? parent : parent + '/');
+          }
+          break;
+        }
+        case 'ArrowRight': {
+          // Open selected directory
+          if (fs.selectedFile?.type === 'dir') {
+            e.preventDefault();
+            const dirPath = fs.selectedFile.path.endsWith('/')
+              ? fs.selectedFile.path
+              : fs.selectedFile.path + '/';
+            fs.navigateTo(dirPath);
+          }
+          break;
+        }
+        case 'Escape': {
+          fs.clearSelection();
+          break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTab, showViewer, dialog.type, fs, handleDoubleClick]);
+
   const handleContextMenu = useCallback((e: React.MouseEvent, entry: FileInfo) => {
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY, entry });

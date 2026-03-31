@@ -255,6 +255,13 @@ export function useFileSystem(client: Db9Client | null, databaseId: string) {
     await refreshCurrent();
   }, [client, databaseId, selectedPaths, currentEntries, refreshCurrent]);
 
+  const selectAll = useCallback((paths: Set<string>) => {
+    setSelectedPaths(paths);
+    // Set selectedFile to the last entry for context
+    const last = currentEntries.filter(e => paths.has(e.path)).pop();
+    if (last) setSelectedFile(last);
+  }, [currentEntries]);
+
   const clearSelection = useCallback(() => {
     setSelectedFile(null);
     setSelectedPaths(new Set());
@@ -267,7 +274,7 @@ export function useFileSystem(client: Db9Client | null, databaseId: string) {
     viewMode, setViewMode, columns, loading, error, clearError,
     navigateTo, selectEntry, expandTreeNode, collapseTreeNode,
     initRoot, saveFile, createFile, createDir, deleteEntry, deleteSelected,
-    clearSelection, refreshCurrent,
+    selectAll, clearSelection, refreshCurrent,
   };
 }
 
