@@ -375,8 +375,6 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
               <ViewerSidebar
                 client={client}
                 databaseId={databaseId}
-                entries={fs.currentEntries}
-                currentPath={fs.currentPath}
                 selectedPath={fs.selectedFile.path}
                 onSelectFile={(entry) => fs.selectEntry(entry)}
                 onBack={() => setShowViewer(false)}
