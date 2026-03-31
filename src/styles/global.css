@@ -891,6 +891,81 @@ button { cursor: pointer; }
   margin: 4px 0;
 }
 
+/* ── Quick Open (Cmd+P) ──────────────────────────── */
+
+.quick-open-overlay {
+  position: fixed;
+  inset: 0;
+  background: hsl(0 0% 0% / 0.5);
+  z-index: 300;
+  display: flex;
+  justify-content: center;
+  padding-top: 15vh;
+}
+.quick-open {
+  background: var(--card-strong);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  width: min(520px, 90vw);
+  max-height: 400px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 16px 48px hsl(0 0% 0% / 0.5);
+  overflow: hidden;
+}
+.quick-open-input {
+  width: 100%;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--foreground);
+  font-size: 14px;
+  font-family: var(--font-mono);
+  outline: none;
+}
+.quick-open-input::placeholder {
+  color: var(--text-muted);
+}
+.quick-open-results {
+  overflow-y: auto;
+  flex: 1;
+}
+.quick-open-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.quick-open-item.selected {
+  background: hsl(0 0% 100% / 0.08);
+}
+.quick-open-item .icon {
+  flex-shrink: 0;
+}
+.quick-open-name {
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.quick-open-path {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quick-open-empty {
+  padding: 20px 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
 /* ── Tabs ────────────────────────────────────────── */
 
 .app-tabs {

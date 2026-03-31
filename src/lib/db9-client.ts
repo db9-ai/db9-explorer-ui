@@ -149,6 +149,22 @@ export class Db9Client {
     }));
   }
 
+  async listDirRecursive(databaseId: string, path: string): Promise<FileInfo[]> {
+    const safePath = escapeSql(path.endsWith('/') ? path : path + '/');
+    const result = await this.sql(databaseId,
+      `SELECT path, type, size, mode, mtime FROM extensions.fs9('${safePath}', recursive => true) ORDER BY path ASC`
+    );
+    const err = this.parseSqlError(result);
+    if (err) throw new Db9Error(err);
+    return result.rows.map(row => ({
+      path: row[0] as string,
+      type: row[1] as 'file' | 'dir',
+      size: Number(row[2]),
+      mode: Number(row[3]),
+      mtime: row[4] as string,
+    }));
+  }
+
   async readFile(databaseId: string, path: string): Promise<string> {
     const safePath = escapeSql(path);
     const result = await this.sql(databaseId, `SELECT fs9_read('${safePath}')`);

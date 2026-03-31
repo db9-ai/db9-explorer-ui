@@ -9,6 +9,7 @@ import { GridView } from './GridView';
 import { ColumnView } from './ColumnView';
 import { FileViewer } from './FileViewer';
 import { SqlExplorer } from './SqlExplorer';
+import { QuickOpen } from './QuickOpen';
 import { CreateDialog, DeleteDialog, DeleteMultiDialog, RenameDialog } from './Dialogs';
 import { ContextMenu, type ContextMenuItem } from './ContextMenu';
 import { RefreshIcon } from './Icons';
@@ -42,6 +43,7 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
   const [dialog, setDialog] = useState<DialogState>({ type: 'none' });
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [showViewer, setShowViewer] = useState(false);
+  const [showQuickOpen, setShowQuickOpen] = useState(false);
   const uploadRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { fs.initRoot(); }, []);// eslint-disable-line react-hooks/exhaustive-deps
@@ -60,6 +62,18 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
       setShowViewer(true);
     }
   }, [fs]);
+
+  // Cmd+P: Quick Open (global shortcut)
+  useEffect(() => {
+    const handleCmdP = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
+        e.preventDefault();
+        setShowQuickOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleCmdP);
+    return () => window.removeEventListener('keydown', handleCmdP);
+  }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -246,6 +260,19 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
     a.click();
     URL.revokeObjectURL(url);
   }, [fs.selectedFile, fs.fileContent]);
+
+  const handleQuickOpen = useCallback((entry: FileInfo) => {
+    setShowQuickOpen(false);
+    // Navigate to the file's parent directory and select it
+    const parent = dirname(entry.path);
+    const dirPath = parent.endsWith('/') ? parent : parent + '/';
+    fs.navigateTo(dirPath).then(() => {
+      fs.selectEntry(entry);
+      if (entry.type === 'file') {
+        setShowViewer(true);
+      }
+    });
+  }, [fs]);
 
   const handleCopyPath = useCallback((path: string) => {
     navigator.clipboard.writeText(path).catch(() => {
@@ -450,6 +477,16 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
           currentName={basename(dialog.entry.path)}
           onConfirm={handleRename}
           onCancel={() => setDialog({ type: 'none' })}
+        />
+      )}
+
+      {/* Quick Open */}
+      {showQuickOpen && (
+        <QuickOpen
+          client={client}
+          databaseId={databaseId}
+          onSelect={handleQuickOpen}
+          onClose={() => setShowQuickOpen(false)}
         />
       )}
 
