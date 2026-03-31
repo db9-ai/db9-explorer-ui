@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useLocation, useNavigate, useBlocker } from 'react-router-dom';
 import type { Db9Client, FileInfo } from '../lib/db9-client';
 import { useFileSystem } from '../hooks/useFileSystem';
 import { basename, joinPath, dirname } from '../lib/utils';
@@ -14,8 +15,6 @@ import { QuickOpen } from './QuickOpen';
 import { CreateDialog, DeleteDialog, DeleteMultiDialog, RenameDialog } from './Dialogs';
 import { ContextMenu, type ContextMenuItem } from './ContextMenu';
 import { RefreshIcon } from './Icons';
-
-type ActiveTab = 'files' | 'sql';
 
 interface Props {
   client: Db9Client;
@@ -39,15 +38,103 @@ interface ContextMenuState {
 }
 
 export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }: Props) {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('files');
+  const location = useLocation();
+  const navigate = useNavigate();
   const fs = useFileSystem(client, databaseId);
   const [dialog, setDialog] = useState<DialogState>({ type: 'none' });
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-  const [showViewer, setShowViewer] = useState(false);
   const [showQuickOpen, setShowQuickOpen] = useState(false);
+  const [editorDirty, setEditorDirty] = useState(false);
   const uploadRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { fs.initRoot(); }, []);// eslint-disable-line react-hooks/exhaustive-deps
+  // --- Derive state from URL ---
+  const activeTab = location.pathname.startsWith('/sql') ? 'sql' as const : 'files' as const;
+  const showViewer = location.pathname.startsWith('/view/');
+
+  // Extract fs path from URL
+  const getPathFromUrl = useCallback((): string => {
+    if (location.pathname.startsWith('/browse/')) {
+      return '/' + location.pathname.slice('/browse/'.length);
+    }
+    if (location.pathname.startsWith('/view/')) {
+      return '/' + location.pathname.slice('/view/'.length);
+    }
+    return '/';
+  }, [location.pathname]);
+
+  const currentFsPath = getPathFromUrl();
+
+  // --- Navigation helpers (push to router) ---
+  const navigateToDir = useCallback((dirPath: string) => {
+    const clean = dirPath.startsWith('/') ? dirPath : '/' + dirPath;
+    navigate('/browse' + clean);
+  }, [navigate]);
+
+  const navigateToFile = useCallback((filePath: string) => {
+    const clean = filePath.startsWith('/') ? filePath : '/' + filePath;
+    navigate('/view' + clean);
+  }, [navigate]);
+
+  // --- Block navigation when editor is dirty ---
+  const blocker = useBlocker(editorDirty);
+
+  useEffect(() => {
+    if (blocker.state === 'blocked') {
+      const proceed = window.confirm('You have unsaved changes. Discard them?');
+      if (proceed) {
+        blocker.proceed();
+      } else {
+        blocker.reset();
+      }
+    }
+  }, [blocker]);
+
+  // Browser beforeunload guard
+  useEffect(() => {
+    if (!editorDirty) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [editorDirty]);
+
+  // --- Sync fs state from URL ---
+  const prevPathRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (activeTab !== 'files') return;
+    const fsPath = currentFsPath;
+
+    if (showViewer) {
+      // Viewing a file — select it, load content
+      const parentDir = dirname(fsPath);
+      const dirPath = parentDir.endsWith('/') ? parentDir : parentDir + '/';
+
+      if (prevPathRef.current !== dirPath) {
+        fs.navigateTo(dirPath).then(() => {
+          const entry: FileInfo = { path: fsPath, type: 'file', size: 0, mode: 0, mtime: '' };
+          fs.selectEntry(entry);
+        });
+      } else {
+        const entry: FileInfo = { path: fsPath, type: 'file', size: 0, mode: 0, mtime: '' };
+        fs.selectEntry(entry);
+      }
+      prevPathRef.current = dirPath;
+    } else {
+      // Browsing a directory
+      const dirPath = fsPath.endsWith('/') ? fsPath : fsPath + '/';
+      if (prevPathRef.current !== dirPath) {
+        fs.navigateTo(dirPath);
+        prevPathRef.current = dirPath;
+      }
+    }
+  }, [currentFsPath, showViewer, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Init root on mount
+  useEffect(() => {
+    if (activeTab === 'files' && !showViewer && currentFsPath === '/') {
+      fs.initRoot();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelectEntry = useCallback((entry: FileInfo, e: React.MouseEvent) => {
     fs.selectEntry(entry, { metaKey: e.metaKey || e.ctrlKey, shiftKey: e.shiftKey });
@@ -56,33 +143,18 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
   const handleDoubleClick = useCallback((entry: FileInfo) => {
     if (entry.type === 'dir') {
       const dirPath = entry.path.endsWith('/') ? entry.path : entry.path + '/';
-      fs.navigateTo(dirPath);
+      navigateToDir(dirPath);
     } else {
-      // Double-click file: select + open viewer
       fs.selectEntry(entry);
-      setShowViewer(true);
+      navigateToFile(entry.path);
     }
-  }, [fs]);
-
-  // Cmd+P: Quick Open (global shortcut)
-  // TODO: disabled until db9-server supports fs9_search() — see c4pt0r/db9-server#2251
-  // useEffect(() => {
-  //   const handleCmdP = (e: KeyboardEvent) => {
-  //     if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
-  //       e.preventDefault();
-  //       setShowQuickOpen(prev => !prev);
-  //     }
-  //   };
-  //   window.addEventListener('keydown', handleCmdP);
-  //   return () => window.removeEventListener('keydown', handleCmdP);
-  // }, []);
+  }, [fs, navigateToDir, navigateToFile]);
 
   // Keyboard shortcuts
   useEffect(() => {
     if (activeTab !== 'files' || showViewer || dialog.type !== 'none') return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't handle when typing in inputs
       const tag = (e.target as HTMLElement).tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
@@ -128,7 +200,6 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
           break;
         }
         case 'a': {
-          // Cmd+A: select all
           if (e.metaKey || e.ctrlKey) {
             e.preventDefault();
             const allPaths = new Set(entries.map(en => en.path));
@@ -137,27 +208,24 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
           break;
         }
         case 'ArrowLeft': {
-          // Navigate to parent directory
           if (fs.currentPath !== '/') {
             e.preventDefault();
             const parent = dirname(fs.currentPath.replace(/\/$/, ''));
-            fs.navigateTo(parent.endsWith('/') ? parent : parent + '/');
+            navigateToDir(parent.endsWith('/') ? parent : parent + '/');
           }
           break;
         }
         case 'ArrowRight': {
-          // Open selected directory
           if (fs.selectedFile?.type === 'dir') {
             e.preventDefault();
             const dirPath = fs.selectedFile.path.endsWith('/')
               ? fs.selectedFile.path
               : fs.selectedFile.path + '/';
-            fs.navigateTo(dirPath);
+            navigateToDir(dirPath);
           }
           break;
         }
         case 'F2': {
-          // Rename selected item
           if (fs.selectedFile && fs.selectedPaths.size === 1) {
             e.preventDefault();
             setDialog({ type: 'rename', entry: fs.selectedFile });
@@ -173,7 +241,7 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTab, showViewer, dialog.type, fs, handleDoubleClick]);
+  }, [activeTab, showViewer, dialog.type, fs, handleDoubleClick, navigateToDir]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent, entry: FileInfo) => {
     e.preventDefault();
@@ -222,14 +290,11 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
       const oldPath = dialog.entry.path;
       const parent = dirname(oldPath);
       const newPath = joinPath(parent, newName);
-      // Rename = read old content, write to new path, delete old
       if (dialog.entry.type === 'file') {
         const content = await client.readFile(databaseId, oldPath);
         await client.writeFile(databaseId, newPath, content);
         await client.remove(databaseId, oldPath);
       } else {
-        // For directories, create new and move would be complex
-        // For now just create the new dir
         await client.mkdir(databaseId, newPath);
       }
       setDialog({ type: 'none' });
@@ -248,7 +313,6 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err));
     }
-    // Reset input
     if (uploadRef.current) uploadRef.current.value = '';
   }, [fs]);
 
@@ -265,20 +329,16 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
 
   const handleQuickOpen = useCallback((entry: FileInfo) => {
     setShowQuickOpen(false);
-    // Navigate to the file's parent directory and select it
-    const parent = dirname(entry.path);
-    const dirPath = parent.endsWith('/') ? parent : parent + '/';
-    fs.navigateTo(dirPath).then(() => {
-      fs.selectEntry(entry);
-      if (entry.type === 'file') {
-        setShowViewer(true);
-      }
-    });
-  }, [fs]);
+    if (entry.type === 'file') {
+      navigateToFile(entry.path);
+    } else {
+      const dirPath = entry.path.endsWith('/') ? entry.path : entry.path + '/';
+      navigateToDir(dirPath);
+    }
+  }, [navigateToDir, navigateToFile]);
 
   const handleCopyPath = useCallback((path: string) => {
     navigator.clipboard.writeText(path).catch(() => {
-      // Fallback for non-HTTPS contexts
       const input = document.createElement('input');
       input.value = path;
       document.body.appendChild(input);
@@ -325,10 +385,16 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
           <span className="dim">Explorer</span>
         </div>
         <div className="app-tabs">
-          <button className={`app-tab ${activeTab === 'files' ? 'active' : ''}`} onClick={() => setActiveTab('files')}>
+          <button
+            className={`app-tab ${activeTab === 'files' ? 'active' : ''}`}
+            onClick={() => navigateToDir(fs.currentPath)}
+          >
             Files
           </button>
-          <button className={`app-tab ${activeTab === 'sql' ? 'active' : ''}`} onClick={() => setActiveTab('sql')}>
+          <button
+            className={`app-tab ${activeTab === 'sql' ? 'active' : ''}`}
+            onClick={() => navigate('/sql')}
+          >
             SQL
           </button>
         </div>
@@ -350,7 +416,7 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
           <SqlExplorer client={client} databaseId={databaseId} />
         ) : (
         <div className="main-content">
-          <Breadcrumb path={fs.currentPath} onNavigate={fs.navigateTo} />
+          <Breadcrumb path={fs.currentPath} onNavigate={navigateToDir} />
           <Toolbar
             viewMode={fs.viewMode}
             onViewModeChange={fs.setViewMode}
@@ -376,13 +442,21 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
                 client={client}
                 databaseId={databaseId}
                 selectedPath={fs.selectedFile.path}
-                onSelectFile={(entry) => fs.selectEntry(entry)}
-                onBack={() => setShowViewer(false)}
+                onSelectFile={(entry) => {
+                  if (entry.type === 'file') {
+                    navigateToFile(entry.path);
+                  } else {
+                    const dirPath = entry.path.endsWith('/') ? entry.path : entry.path + '/';
+                    navigateToDir(dirPath);
+                  }
+                }}
+                onBack={() => navigateToDir(fs.currentPath)}
               />
               <FileViewer
                 file={fs.selectedFile}
                 content={fs.fileContent}
                 onSave={fs.saveFile}
+                onDirtyChange={setEditorDirty}
               />
             </div>
           ) : (

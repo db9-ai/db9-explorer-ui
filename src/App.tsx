@@ -1,3 +1,4 @@
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useConnection } from './hooks/useConnection';
 import { DatabasePicker } from './components/ConnectPanel';
 import { Explorer } from './components/Explorer';
@@ -46,12 +47,21 @@ export default function App() {
     );
   }
 
-  return (
+  const explorer = (
     <Explorer
       client={conn.client}
       databaseId={conn.databaseId}
       databaseName={conn.databaseName}
       onSwitchDatabase={conn.switchDatabase}
     />
+  );
+
+  return (
+    <Routes>
+      <Route path="/sql" element={explorer} />
+      <Route path="/view/*" element={explorer} />
+      <Route path="/browse/*" element={explorer} />
+      <Route path="*" element={<Navigate to="/browse/" replace />} />
+    </Routes>
   );
 }
