@@ -24,13 +24,14 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Bump version
         id: version
         run: |
           npm version ${{ inputs.bump }} --no-git-tag-version
+          npm install --package-lock-only
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
