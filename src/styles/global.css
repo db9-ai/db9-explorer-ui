@@ -745,6 +745,19 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   color: var(--soft-foreground);
 }
 
+.viewer-sidebar-chevron {
+  font-size: 10px;
+  color: var(--terminal-accent);
+  flex-shrink: 0;
+  transition: transform 0.2s var(--spring);
+  width: 12px;
+  display: inline-flex;
+  align-items: center;
+}
+.viewer-sidebar-chevron.open {
+  transform: rotate(90deg);
+}
+
 .viewer-sidebar-icon {
   font-size: 13px;
   flex-shrink: 0;
@@ -753,6 +766,19 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .viewer-sidebar-name {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.viewer-sidebar-children {
+  animation: slideDown 0.15s var(--ease-out);
+}
+
+.viewer-sidebar-loading {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  height: 28px;
+  display: flex;
+  align-items: center;
 }
 
 /* ── File Viewer ─────────────────────────────────── */
