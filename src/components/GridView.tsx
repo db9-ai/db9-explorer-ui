@@ -3,13 +3,13 @@ import { basename, getFileIcon } from '../lib/utils';
 
 interface Props {
   entries: FileInfo[];
-  selectedPath: string | null;
-  onSelect: (entry: FileInfo) => void;
+  selectedPaths: Set<string>;
+  onSelect: (entry: FileInfo, e: React.MouseEvent) => void;
   onDoubleClick: (entry: FileInfo) => void;
   onContextMenu: (e: React.MouseEvent, entry: FileInfo) => void;
 }
 
-export function GridView({ entries, selectedPath, onSelect, onDoubleClick, onContextMenu }: Props) {
+export function GridView({ entries, selectedPaths, onSelect, onDoubleClick, onContextMenu }: Props) {
   if (entries.length === 0) {
     return (
       <div className="file-grid" style={{ display: 'flex' }}>
@@ -28,8 +28,8 @@ export function GridView({ entries, selectedPath, onSelect, onDoubleClick, onCon
         return (
           <div
             key={entry.path}
-            className={`file-grid-item ${selectedPath === entry.path ? 'selected' : ''}`}
-            onClick={() => onSelect(entry)}
+            className={`file-grid-item ${selectedPaths.has(entry.path) ? 'selected' : ''}`}
+            onClick={e => onSelect(entry, e)}
             onDoubleClick={() => onDoubleClick(entry)}
             onContextMenu={e => onContextMenu(e, entry)}
           >

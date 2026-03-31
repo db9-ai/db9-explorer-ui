@@ -3,13 +3,13 @@ import { basename, formatSize, formatDate, getFileIcon } from '../lib/utils';
 
 interface Props {
   entries: FileInfo[];
-  selectedPath: string | null;
-  onSelect: (entry: FileInfo) => void;
+  selectedPaths: Set<string>;
+  onSelect: (entry: FileInfo, e: React.MouseEvent) => void;
   onDoubleClick: (entry: FileInfo) => void;
   onContextMenu: (e: React.MouseEvent, entry: FileInfo) => void;
 }
 
-export function ListView({ entries, selectedPath, onSelect, onDoubleClick, onContextMenu }: Props) {
+export function ListView({ entries, selectedPaths, onSelect, onDoubleClick, onContextMenu }: Props) {
   return (
     <div className="file-list">
       <div className="file-list-header">
@@ -29,8 +29,8 @@ export function ListView({ entries, selectedPath, onSelect, onDoubleClick, onCon
           return (
             <div
               key={entry.path}
-              className={`file-list-row ${selectedPath === entry.path ? 'selected' : ''}`}
-              onClick={() => onSelect(entry)}
+              className={`file-list-row ${selectedPaths.has(entry.path) ? 'selected' : ''}`}
+              onClick={e => onSelect(entry, e)}
               onDoubleClick={() => onDoubleClick(entry)}
               onContextMenu={e => onContextMenu(e, entry)}
             >

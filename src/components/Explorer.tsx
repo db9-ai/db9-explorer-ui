@@ -9,7 +9,7 @@ import { GridView } from './GridView';
 import { ColumnView } from './ColumnView';
 import { FileViewer } from './FileViewer';
 import { SqlExplorer } from './SqlExplorer';
-import { CreateDialog, DeleteDialog, RenameDialog } from './Dialogs';
+import { CreateDialog, DeleteDialog, DeleteMultiDialog, RenameDialog } from './Dialogs';
 import { ContextMenu, type ContextMenuItem } from './ContextMenu';
 import { RefreshIcon } from './Icons';
 
@@ -27,6 +27,7 @@ type DialogState =
   | { type: 'create-file' }
   | { type: 'create-folder' }
   | { type: 'delete'; entry: FileInfo }
+  | { type: 'delete-multi'; count: number }
   | { type: 'rename'; entry: FileInfo };
 
 interface ContextMenuState {
@@ -45,9 +46,8 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
 
   useEffect(() => { fs.initRoot(); }, []);// eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSelectEntry = useCallback((entry: FileInfo) => {
-    // Single-click: select only (highlight), don't open
-    fs.selectEntry(entry);
+  const handleSelectEntry = useCallback((entry: FileInfo, e: React.MouseEvent) => {
+    fs.selectEntry(entry, { metaKey: e.metaKey || e.ctrlKey, shiftKey: e.shiftKey });
   }, [fs]);
 
   const handleDoubleClick = useCallback((entry: FileInfo) => {
@@ -85,12 +85,20 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
   }, [fs]);
 
   const handleDelete = useCallback(async () => {
-    if (dialog.type !== 'delete') return;
-    try {
-      await fs.deleteEntry(dialog.entry.path, dialog.entry.type === 'dir');
-      setDialog({ type: 'none' });
-    } catch (err) {
-      alert(err instanceof Error ? err.message : String(err));
+    if (dialog.type === 'delete') {
+      try {
+        await fs.deleteEntry(dialog.entry.path, dialog.entry.type === 'dir');
+        setDialog({ type: 'none' });
+      } catch (err) {
+        alert(err instanceof Error ? err.message : String(err));
+      }
+    } else if (dialog.type === 'delete-multi') {
+      try {
+        await fs.deleteSelected();
+        setDialog({ type: 'none' });
+      } catch (err) {
+        alert(err instanceof Error ? err.message : String(err));
+      }
     }
   }, [fs, dialog]);
 
@@ -185,11 +193,18 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
             viewMode={fs.viewMode}
             onViewModeChange={fs.setViewMode}
             selectedFile={fs.selectedFile}
+            selectedCount={fs.selectedPaths.size}
             onNewFile={() => setDialog({ type: 'create-file' })}
             onNewFolder={() => setDialog({ type: 'create-folder' })}
             onUpload={() => uploadRef.current?.click()}
             onDownload={handleDownload}
-            onDelete={() => fs.selectedFile && setDialog({ type: 'delete', entry: fs.selectedFile })}
+            onDelete={() => {
+              if (fs.selectedPaths.size > 1) {
+                setDialog({ type: 'delete-multi', count: fs.selectedPaths.size });
+              } else if (fs.selectedFile) {
+                setDialog({ type: 'delete', entry: fs.selectedFile });
+              }
+            }}
             onRefresh={fs.refreshCurrent}
           />
 
@@ -215,7 +230,7 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
               {fs.viewMode === 'list' && (
                 <ListView
                   entries={fs.currentEntries}
-                  selectedPath={fs.selectedFile?.path ?? null}
+                  selectedPaths={fs.selectedPaths}
                   onSelect={handleSelectEntry}
                   onDoubleClick={handleDoubleClick}
                   onContextMenu={handleContextMenu}
@@ -224,7 +239,7 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
               {fs.viewMode === 'grid' && (
                 <GridView
                   entries={fs.currentEntries}
-                  selectedPath={fs.selectedFile?.path ?? null}
+                  selectedPaths={fs.selectedPaths}
                   onSelect={handleSelectEntry}
                   onDoubleClick={handleDoubleClick}
                   onContextMenu={handleContextMenu}
@@ -233,7 +248,7 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
               {fs.viewMode === 'column' && (
                 <ColumnView
                   columns={fs.columns}
-                  selectedPath={fs.selectedFile?.path ?? null}
+                  selectedPaths={fs.selectedPaths}
                   onSelect={handleSelectEntry}
                   onContextMenu={handleContextMenu}
                 />
@@ -250,7 +265,10 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
           <span className="status-dot" />
           Connected
         </span>
-        <span>{fs.currentEntries.length} items</span>
+        <span>
+          {fs.currentEntries.length} items
+          {fs.selectedPaths.size > 1 && ` · ${fs.selectedPaths.size} selected`}
+        </span>
         {fs.error && <span style={{ color: 'var(--danger)' }}>{fs.error}</span>}
       </div>
 
@@ -283,6 +301,13 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
         <DeleteDialog
           path={dialog.entry.path}
           isDir={dialog.entry.type === 'dir'}
+          onConfirm={handleDelete}
+          onCancel={() => setDialog({ type: 'none' })}
+        />
+      )}
+      {dialog.type === 'delete-multi' && (
+        <DeleteMultiDialog
+          count={dialog.count}
           onConfirm={handleDelete}
           onCancel={() => setDialog({ type: 'none' })}
         />

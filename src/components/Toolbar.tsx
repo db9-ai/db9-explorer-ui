@@ -9,6 +9,7 @@ interface Props {
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
   selectedFile: FileInfo | null;
+  selectedCount: number;
   onNewFile: () => void;
   onNewFolder: () => void;
   onUpload: () => void;
@@ -18,9 +19,12 @@ interface Props {
 }
 
 export function Toolbar({
-  viewMode, onViewModeChange, selectedFile,
+  viewMode, onViewModeChange, selectedFile, selectedCount,
   onNewFile, onNewFolder, onUpload, onDownload, onDelete, onRefresh,
 }: Props) {
+  const hasSelection = selectedCount > 0;
+  const singleFileSelected = selectedCount === 1 && selectedFile?.type === 'file';
+
   return (
     <div className="toolbar">
       <div className="toolbar-group">
@@ -36,21 +40,31 @@ export function Toolbar({
         <button className="toolbar-btn" onClick={onUpload} title="Upload">
           <UploadIcon /> Upload
         </button>
-        {selectedFile && selectedFile.type === 'file' && (
+        {singleFileSelected && (
           <button className="toolbar-btn" onClick={onDownload} title="Download">
             <DownloadIcon />
           </button>
         )}
       </div>
-      {selectedFile && (
+      {hasSelection && (
         <>
           <div className="toolbar-sep" />
-          <button className="toolbar-btn danger" onClick={onDelete} title="Delete">
+          <button
+            className="toolbar-btn danger"
+            onClick={onDelete}
+            title={selectedCount > 1 ? `Delete ${selectedCount} items` : 'Delete'}
+          >
             <TrashIcon />
+            {selectedCount > 1 && <span style={{ marginLeft: 2 }}>{selectedCount}</span>}
           </button>
         </>
       )}
       <div className="toolbar-spacer" />
+      {selectedCount > 1 && (
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 8 }}>
+          {selectedCount} selected
+        </span>
+      )}
       <button className="toolbar-btn" onClick={onRefresh} title="Refresh">
         <RefreshIcon />
       </button>

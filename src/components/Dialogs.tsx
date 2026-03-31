@@ -69,6 +69,31 @@ export function DeleteDialog({ path, isDir, onConfirm, onCancel }: DeleteDialogP
   );
 }
 
+interface DeleteMultiDialogProps {
+  count: number;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+export function DeleteMultiDialog({ count, onConfirm, onCancel }: DeleteMultiDialogProps) {
+  return (
+    <div className="dialog-overlay" onClick={onCancel}>
+      <div className="dialog" onClick={e => e.stopPropagation()}>
+        <div className="dialog-title">Delete {count} Items</div>
+        <div className="dialog-body">
+          <div className="dialog-text">
+            Are you sure you want to delete {count} selected items? This cannot be undone.
+          </div>
+        </div>
+        <div className="dialog-actions">
+          <button className="btn-sm btn-secondary" onClick={onCancel}>Cancel</button>
+          <button className="btn-sm btn-danger" onClick={onConfirm}>Delete {count} Items</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface RenameDialogProps {
   currentName: string;
   onConfirm: (newName: string) => void;

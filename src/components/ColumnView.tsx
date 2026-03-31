@@ -4,12 +4,12 @@ import { basename, getFileIcon } from '../lib/utils';
 
 interface Props {
   columns: ColumnEntry[];
-  selectedPath: string | null;
-  onSelect: (entry: FileInfo) => void;
+  selectedPaths: Set<string>;
+  onSelect: (entry: FileInfo, e: React.MouseEvent) => void;
   onContextMenu: (e: React.MouseEvent, entry: FileInfo) => void;
 }
 
-export function ColumnView({ columns, selectedPath, onSelect, onContextMenu }: Props) {
+export function ColumnView({ columns, selectedPaths, onSelect, onContextMenu }: Props) {
   return (
     <div className="column-view">
       {columns.map((col, i) => (
@@ -25,8 +25,8 @@ export function ColumnView({ columns, selectedPath, onSelect, onContextMenu }: P
               return (
                 <div
                   key={entry.path}
-                  className={`column-item ${isDir ? 'dir' : ''} ${selectedPath === entry.path ? 'selected' : ''}`}
-                  onClick={() => onSelect(entry)}
+                  className={`column-item ${isDir ? 'dir' : ''} ${selectedPaths.has(entry.path) ? 'selected' : ''}`}
+                  onClick={e => onSelect(entry, e)}
                   onContextMenu={e => onContextMenu(e, entry)}
                 >
                   <span className="icon">{getFileIcon(name, isDir)}</span>
