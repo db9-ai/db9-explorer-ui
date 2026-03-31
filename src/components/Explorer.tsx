@@ -140,6 +140,10 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
     fs.selectEntry(entry, { metaKey: e.metaKey || e.ctrlKey, shiftKey: e.shiftKey });
   }, [fs]);
 
+  const handleMarqueeSelect = useCallback((paths: Set<string>) => {
+    fs.selectAll(paths);
+  }, [fs]);
+
   const handleDoubleClick = useCallback((entry: FileInfo) => {
     if (entry.type === 'dir') {
       const dirPath = entry.path.endsWith('/') ? entry.path : entry.path + '/';
@@ -468,6 +472,7 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
                   onSelect={handleSelectEntry}
                   onDoubleClick={handleDoubleClick}
                   onContextMenu={handleContextMenu}
+                  onMarqueeSelect={handleMarqueeSelect}
                 />
               )}
               {fs.viewMode === 'grid' && (
@@ -477,6 +482,7 @@ export function Explorer({ client, databaseId, databaseName, onSwitchDatabase }:
                   onSelect={handleSelectEntry}
                   onDoubleClick={handleDoubleClick}
                   onContextMenu={handleContextMenu}
+                  onMarqueeSelect={handleMarqueeSelect}
                 />
               )}
               {fs.viewMode === 'column' && (

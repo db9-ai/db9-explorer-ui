@@ -1,5 +1,7 @@
+import { useRef } from 'react';
 import type { FileInfo } from '../lib/db9-client';
 import { basename, getFileIcon } from '../lib/utils';
+import { useMarqueeSelection } from '../hooks/useMarqueeSelection';
 
 interface Props {
   entries: FileInfo[];
@@ -7,9 +9,18 @@ interface Props {
   onSelect: (entry: FileInfo, e: React.MouseEvent) => void;
   onDoubleClick: (entry: FileInfo) => void;
   onContextMenu: (e: React.MouseEvent, entry: FileInfo) => void;
+  onMarqueeSelect: (paths: Set<string>) => void;
 }
 
-export function GridView({ entries, selectedPaths, onSelect, onDoubleClick, onContextMenu }: Props) {
+export function GridView({ entries, selectedPaths, onSelect, onDoubleClick, onContextMenu, onMarqueeSelect }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { marqueeRect } = useMarqueeSelection({
+    containerRef,
+    itemSelector: '.file-grid-item',
+    selectedPaths,
+    onSelectionChange: onMarqueeSelect,
+  });
+
   if (entries.length === 0) {
     return (
       <div className="file-grid" style={{ display: 'flex' }}>
@@ -21,13 +32,14 @@ export function GridView({ entries, selectedPaths, onSelect, onDoubleClick, onCo
   }
 
   return (
-    <div className="file-grid">
+    <div className="file-grid" ref={containerRef}>
       {entries.map(entry => {
         const name = basename(entry.path);
         const isDir = entry.type === 'dir';
         return (
           <div
             key={entry.path}
+            data-path={entry.path}
             className={`file-grid-item ${selectedPaths.has(entry.path) ? 'selected' : ''}`}
             onClick={e => onSelect(entry, e)}
             onDoubleClick={() => onDoubleClick(entry)}
@@ -38,6 +50,17 @@ export function GridView({ entries, selectedPaths, onSelect, onDoubleClick, onCo
           </div>
         );
       })}
+      {marqueeRect && (
+        <div
+          className="marquee-rect"
+          style={{
+            left: marqueeRect.x,
+            top: marqueeRect.y,
+            width: marqueeRect.width,
+            height: marqueeRect.height,
+          }}
+        />
+      )}
     </div>
   );
 }

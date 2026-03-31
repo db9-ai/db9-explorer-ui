@@ -1,5 +1,7 @@
+import { useRef } from 'react';
 import type { FileInfo } from '../lib/db9-client';
 import { basename, formatSize, formatDate, getFileIcon } from '../lib/utils';
+import { useMarqueeSelection } from '../hooks/useMarqueeSelection';
 
 interface Props {
   entries: FileInfo[];
@@ -7,11 +9,20 @@ interface Props {
   onSelect: (entry: FileInfo, e: React.MouseEvent) => void;
   onDoubleClick: (entry: FileInfo) => void;
   onContextMenu: (e: React.MouseEvent, entry: FileInfo) => void;
+  onMarqueeSelect: (paths: Set<string>) => void;
 }
 
-export function ListView({ entries, selectedPaths, onSelect, onDoubleClick, onContextMenu }: Props) {
+export function ListView({ entries, selectedPaths, onSelect, onDoubleClick, onContextMenu, onMarqueeSelect }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { marqueeRect } = useMarqueeSelection({
+    containerRef,
+    itemSelector: '.file-list-row',
+    selectedPaths,
+    onSelectionChange: onMarqueeSelect,
+  });
+
   return (
-    <div className="file-list">
+    <div className="file-list" ref={containerRef}>
       <div className="file-list-header">
         <span>Name</span>
         <span className="right">Size</span>
@@ -29,6 +40,7 @@ export function ListView({ entries, selectedPaths, onSelect, onDoubleClick, onCo
           return (
             <div
               key={entry.path}
+              data-path={entry.path}
               className={`file-list-row ${selectedPaths.has(entry.path) ? 'selected' : ''}`}
               onClick={e => onSelect(entry, e)}
               onDoubleClick={() => onDoubleClick(entry)}
@@ -44,6 +56,17 @@ export function ListView({ entries, selectedPaths, onSelect, onDoubleClick, onCo
             </div>
           );
         })
+      )}
+      {marqueeRect && (
+        <div
+          className="marquee-rect"
+          style={{
+            left: marqueeRect.x,
+            top: marqueeRect.y,
+            width: marqueeRect.width,
+            height: marqueeRect.height,
+          }}
+        />
       )}
     </div>
   );
