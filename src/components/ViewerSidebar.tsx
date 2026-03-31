@@ -75,8 +75,10 @@ export function ViewerSidebar({
             }
           }}
         >
-          {isDir && (
+          {isDir ? (
             <span className={`viewer-sidebar-chevron ${isOpen ? 'open' : ''}`}>▸</span>
+          ) : (
+            <span className="viewer-sidebar-chevron spacer" />
           )}
           <span className="viewer-sidebar-icon">{getFileIcon(name, isDir)}</span>
           <span className="viewer-sidebar-name">{name}</span>

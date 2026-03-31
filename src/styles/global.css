@@ -757,6 +757,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .viewer-sidebar-chevron.open {
   transform: rotate(90deg);
 }
+.viewer-sidebar-chevron.spacer {
+  visibility: hidden;
+}
 
 .viewer-sidebar-icon {
   font-size: 13px;
