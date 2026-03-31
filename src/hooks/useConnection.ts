@@ -40,6 +40,22 @@ export function useConnection() {
     bootstrap();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  function applyDbList(dbs: DatabaseInfo[]) {
+    if (dbs.length === 0) {
+      setState(s => ({ ...s, phase: 'error', error: 'No active databases found.' }));
+    } else if (dbs.length === 1) {
+      setState(s => ({
+        ...s,
+        phase: 'connected',
+        databases: dbs,
+        databaseId: dbs[0].id,
+        databaseName: dbs[0].name || dbs[0].id,
+      }));
+    } else {
+      setState(s => ({ ...s, phase: 'pick-db', databases: dbs }));
+    }
+  }
+
   async function bootstrap() {
     const params = new URLSearchParams(window.location.search);
     const dbParam = params.get('db');
@@ -69,42 +85,15 @@ export function useConnection() {
         return;
       }
 
-      // Otherwise list databases and pick
+      // No target — list databases and pick
       const dbs = await client.listDatabases();
-      if (dbs.length === 0) {
-        setState(s => ({ ...s, phase: 'error', error: 'No active databases found.' }));
-        return;
-      }
-      if (dbs.length === 1) {
-        setState(s => ({
-          ...s,
-          phase: 'connected',
-          databases: dbs,
-          databaseId: dbs[0].id,
-          databaseName: dbs[0].name || dbs[0].id,
-        }));
-        return;
-      }
-      // Multiple databases — let user pick
-      setState(s => ({ ...s, phase: 'pick-db', databases: dbs }));
+      applyDbList(dbs);
     } catch (err) {
-      // If hash dbId failed, fall back to listing databases
+      // If hash dbId lookup failed, fall back to listing databases
       if (hashDbId && !dbParam) {
         try {
           const dbs = await client.listDatabases();
-          if (dbs.length === 0) {
-            setState(s => ({ ...s, phase: 'error', error: 'No active databases found.' }));
-          } else if (dbs.length === 1) {
-            setState(s => ({
-              ...s,
-              phase: 'connected',
-              databases: dbs,
-              databaseId: dbs[0].id,
-              databaseName: dbs[0].name || dbs[0].id,
-            }));
-          } else {
-            setState(s => ({ ...s, phase: 'pick-db', databases: dbs }));
-          }
+          applyDbList(dbs);
           return;
         } catch { /* fall through */ }
       }

@@ -33,6 +33,7 @@ export function useFileSystem(client: Db9Client | null, databaseId: string) {
   const [error, setError] = useState<string | null>(null);
   const entriesCacheRef = useRef<Map<string, FileInfo[]>>(new Map());
   const lastClickedPathRef = useRef<string | null>(null);
+  const readRequestId = useRef(0);
 
   const clearError = useCallback(() => setError(null), []);
 
@@ -150,18 +151,21 @@ export function useFileSystem(client: Db9Client | null, databaseId: string) {
       }
       setFileContent(null);
     } else {
-      // File: load content only if this is the sole selection
+      // File: load content. Use a request ID to discard stale responses
+      // from rapid clicks (only the latest click's result is applied).
       setFileContent(null);
       setError(null);
-      // We check the resulting selection size after state updates
-      // For simplicity, load content for the clicked file regardless;
-      // the UI can decide whether to show the viewer based on selection count
+      const thisRequest = ++readRequestId.current;
       try {
         const content = await client.readFile(databaseId, entry.path);
-        setFileContent(content);
+        if (thisRequest === readRequestId.current) {
+          setFileContent(content);
+        }
       } catch (err) {
-        setFileContent(null);
-        setError(err instanceof Error ? err.message : String(err));
+        if (thisRequest === readRequestId.current) {
+          setFileContent(null);
+          setError(err instanceof Error ? err.message : String(err));
+        }
       }
     }
   }, [client, databaseId, viewMode, loadDirectory, getOrderedEntries, columns, currentEntries]);
@@ -269,12 +273,16 @@ export function useFileSystem(client: Db9Client | null, databaseId: string) {
     lastClickedPathRef.current = null;
   }, []);
 
+  const clearCache = useCallback(() => {
+    entriesCacheRef.current.clear();
+  }, []);
+
   return {
     tree, currentPath, currentEntries, selectedFile, selectedPaths, fileContent,
     viewMode, setViewMode, columns, loading, error, clearError,
     navigateTo, selectEntry, expandTreeNode, collapseTreeNode,
     initRoot, saveFile, createFile, createDir, deleteEntry, deleteSelected,
-    selectAll, clearSelection, refreshCurrent,
+    selectAll, clearSelection, clearCache, refreshCurrent,
   };
 }
 

@@ -373,6 +373,8 @@ export function Explorer({ client, databaseId, databaseName, onConnectDatabase }
         await client.mkdir(databaseId, newPath);
       }
       setDialog({ type: 'none' });
+      // Clear all caches so sidebar/tree reflect the rename
+      fs.clearCache();
       await fs.refreshCurrent();
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err));
