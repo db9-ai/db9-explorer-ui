@@ -14,6 +14,10 @@ export default function App() {
             <span className="dim">Explorer</span>
           </div>
           <div className="connect-subtitle">Connecting…</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="shimmer" style={{ height: 44, borderRadius: 10 }} />
+            <div className="shimmer" style={{ height: 44, borderRadius: 10, opacity: 0.6 }} />
+          </div>
         </div>
       </div>
     );
