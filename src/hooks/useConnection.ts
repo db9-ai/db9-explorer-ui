@@ -32,11 +32,22 @@ export function useConnection() {
   const client = useRef(new Db9Client()).current;
 
   // Determine initial phase:
-  // - Dev mode (Vite proxy handles auth) → skip login
+  // - ?token= URL param → save to sessionStorage, strip from URL, skip login
   // - CLI mode (session secret injected) → skip login
   // - Saved token in sessionStorage → restore token, skip login
   // - Otherwise → show login screen
   const initialPhase = (() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get('token');
+    if (urlToken) {
+      sessionStorage.setItem(TOKEN_KEY, urlToken);
+      client.setToken(urlToken);
+      params.delete('token');
+      const qs = params.toString();
+      const clean = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
+      window.history.replaceState({}, '', clean);
+      return 'loading' as const;
+    }
     if (hasSessionSecret()) return 'loading' as const;
     const saved = sessionStorage.getItem(TOKEN_KEY);
     if (saved) {
