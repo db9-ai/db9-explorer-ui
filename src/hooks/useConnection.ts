@@ -37,7 +37,6 @@ export function useConnection() {
   // - Saved token in sessionStorage → restore token, skip login
   // - Otherwise → show login screen
   const initialPhase = (() => {
-    if (import.meta.env.DEV) return 'loading' as const;
     if (hasSessionSecret()) return 'loading' as const;
     const saved = sessionStorage.getItem(TOKEN_KEY);
     if (saved) {
