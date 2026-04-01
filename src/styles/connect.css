@@ -121,3 +121,53 @@
   font-family: var(--font-mono);
   animation: fadeInUp 0.2s var(--ease-out);
 }
+
+/* ── Login Form ─────────────────────────────────── */
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: fadeInUp 0.3s var(--ease-out) 0.05s both;
+}
+
+.login-input {
+  height: 44px;
+  padding: 0 14px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.login-input::placeholder {
+  color: var(--muted-foreground);
+  opacity: 0.5;
+}
+.login-input:focus {
+  border-color: var(--selection-border);
+  box-shadow: 0 0 0 3px hsl(210 60% 40% / 0.15);
+}
+
+.login-btn {
+  height: 44px;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-out);
+}
+.login-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+  box-shadow: 0 2px 12px hsl(0 0% 0% / 0.3);
+}
+.login-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

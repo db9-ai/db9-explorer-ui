@@ -48,12 +48,22 @@ function getSessionSecret(): string | null {
 /**
  * HTTP client for the db9 Customer API.
  *
- * All requests go to `/api/...` — the local proxy (`db9 explore`)
- * injects `Authorization: Bearer <token>` server-side, so the
- * browser never touches credentials.
+ * Auth modes (checked in order):
+ *  1. Bearer token — set via setToken(), used for web deployments
+ *  2. Session secret — injected by `db9 explore` CLI into index.html
+ *  3. None — relies on server-side proxy (Vite dev mode)
  */
 export class Db9Client {
   private fs9Ensured = new Set<string>();
+  private token: string | null = null;
+
+  setToken(token: string | null) {
+    this.token = token;
+  }
+
+  hasToken(): boolean {
+    return this.token !== null;
+  }
 
   /**
    * Ensure the fs9 extension is enabled on the target database.
@@ -92,7 +102,9 @@ export class Db9Client {
       'Content-Type': 'application/json',
       ...(init?.headers as Record<string, string> || {}),
     };
-    if (sessionSecret) {
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    } else if (sessionSecret) {
       headers['X-DB9-Session'] = sessionSecret;
     }
     const resp = await fetch(`/api${path}`, {

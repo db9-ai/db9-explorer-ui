@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useConnection } from './hooks/useConnection';
 import { DatabasePicker } from './components/ConnectPanel';
+import { LoginScreen } from './components/LoginScreen';
 import { Explorer } from './components/Explorer';
 import type { DatabaseInfo } from './lib/db9-client';
 
@@ -12,6 +13,10 @@ export default function App() {
     conn.pickDatabase(db);
     navigate(`/${db.id}/browse/`, { replace: true });
   };
+
+  if (conn.phase === 'login') {
+    return <LoginScreen onSubmit={conn.submitToken} error={conn.error} />;
+  }
 
   if (conn.phase === 'loading') {
     return (

@@ -1,7 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Db9Client, type DatabaseInfo } from '../lib/db9-client';
 
-export type ConnectionPhase = 'loading' | 'pick-db' | 'connected' | 'error';
+const TOKEN_KEY = 'db9_token';
+
+/** Check if running under `db9 explore` CLI (session secret injected). */
+function hasSessionSecret(): boolean {
+  const secret = (window as unknown as Record<string, unknown>).__DB9_SESSION_SECRET__;
+  return typeof secret === 'string' && secret !== '__DB9_LOCAL_SECRET__';
+}
+
+export type ConnectionPhase = 'login' | 'loading' | 'pick-db' | 'connected' | 'error';
 
 export interface ConnectionState {
   phase: ConnectionPhase;
@@ -23,8 +31,24 @@ export interface ConnectionState {
 export function useConnection() {
   const client = useRef(new Db9Client()).current;
 
+  // Determine initial phase:
+  // - Dev mode (Vite proxy handles auth) → skip login
+  // - CLI mode (session secret injected) → skip login
+  // - Saved token in sessionStorage → restore token, skip login
+  // - Otherwise → show login screen
+  const initialPhase = (() => {
+    if (import.meta.env.DEV) return 'loading' as const;
+    if (hasSessionSecret()) return 'loading' as const;
+    const saved = sessionStorage.getItem(TOKEN_KEY);
+    if (saved) {
+      client.setToken(saved);
+      return 'loading' as const;
+    }
+    return 'login' as const;
+  })();
+
   const [state, setState] = useState<ConnectionState>({
-    phase: 'loading',
+    phase: initialPhase,
     client,
     databases: [],
     databaseId: '',
@@ -36,9 +60,10 @@ export function useConnection() {
 
   useEffect(() => {
     if (initAttempted.current) return;
+    if (state.phase === 'login') return; // wait for token
     initAttempted.current = true;
     bootstrap();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function applyDbList(dbs: DatabaseInfo[]) {
     if (dbs.length === 0) {
@@ -126,5 +151,26 @@ export function useConnection() {
     }
   }, [client]);
 
-  return { ...state, pickDatabase, switchDatabase };
+  const submitToken = useCallback((token: string) => {
+    sessionStorage.setItem(TOKEN_KEY, token);
+    client.setToken(token);
+    initAttempted.current = false;
+    setState(s => ({ ...s, phase: 'loading', error: null }));
+  }, [client]);
+
+  const logout = useCallback(() => {
+    sessionStorage.removeItem(TOKEN_KEY);
+    client.setToken(null);
+    initAttempted.current = false;
+    setState(s => ({
+      ...s,
+      phase: 'login',
+      databases: [],
+      databaseId: '',
+      databaseName: '',
+      error: null,
+    }));
+  }, [client]);
+
+  return { ...state, pickDatabase, switchDatabase, submitToken, logout };
 }
